@@ -5,15 +5,16 @@ Defines the complete multi-agent workflow as a compiled LangGraph StateGraph:
 
     START → orchestrator → critic → coder → critic (loop) →
     docker_gen → validation → [pass?] → solomon → summary → END
-                                ↘ [fail?] → critic (re-analyse)
+                                ↘ [fail?] → critic (re-analyse, max 2 retries)
 
 The Critic ↔ Coder loop runs until either:
   • No issues remain, OR
-  • ``max_iterations`` is reached.
+  • ``max_iterations`` is reached, OR
+  • The coder is stuck (applied 0 patches with issues remaining).
 
 After the loop, Docker configs are generated, the image is built (validation),
 and if successful Solomon deploys the container.  If the build fails, the
-error logs are fed back to the Critic for one more analysis pass.
+error logs are fed back to the Critic for up to 2 re-analysis attempts.
 """
 
 from __future__ import annotations
@@ -30,6 +31,8 @@ from bugrewind.agents.solomon import validation_node, solomon_node, summary_node
 
 logger = logging.getLogger(__name__)
 
+MAX_BUILD_RETRIES = 2  # max times to retry build-fail → critic → coder loop
+
 
 # ── Routing functions ──────────────────────────────────────────────────────
 
@@ -38,20 +41,32 @@ def should_continue_fixing(state: BugRewindState) -> str:
     """Decide whether to loop back to the Critic or move on to Docker gen.
 
     Returns:
-        ``"critic"``     – if there are still issues AND we haven't hit the
+        ``"critic"``     – if there are still un-fixed issues AND the coder
+                           actually made progress AND we haven't hit the
                            iteration cap.
         ``"docker_gen"`` – otherwise.
     """
     iteration = state.get("iteration", 0)
     max_iter = state.get("max_iterations", 3)
-    issues = state.get("issues", [])
+    current_issues = state.get("current_issues", [])
+    last_patch_count = state.get("last_patch_count", 0)
 
     if iteration >= max_iter:
         logger.info("🔁 Max iterations (%d) reached → moving to Docker gen.", max_iter)
         return "docker_gen"
 
-    if not issues:
+    if not current_issues:
         logger.info("🔁 No issues remaining → moving to Docker gen.")
+        return "docker_gen"
+
+    # If the coder failed to apply ANY patches but issues remain, we're stuck.
+    # Don't loop back — it'll just find the same issues again.
+    if last_patch_count == 0 and iteration > 0:
+        logger.warning(
+            "🔁 Coder applied 0 patches with %d issues remaining — "
+            "stuck loop detected, moving to Docker gen.",
+            len(current_issues),
+        )
         return "docker_gen"
 
     logger.info("🔁 Issues remain (iter %d/%d) → looping back to Critic.",
@@ -64,16 +79,29 @@ def should_deploy_or_retry(state: BugRewindState) -> str:
 
     Returns:
         ``"solomon"`` – build succeeded, proceed to deployment.
-        ``"critic"``  – build failed, retry analysis with error logs.
+        ``"critic"``  – build failed AND we haven't exceeded build retries.
+        ``"solomon"`` – build failed BUT we've exhausted retries → deploy anyway
+                        (solomon will handle the failed status gracefully).
     """
     status = state.get("docker_status", "")
+    build_attempts = state.get("build_attempts", 1)
 
     if status == "build_success":
         logger.info("✅ Build succeeded → deploying with Solomon.")
         return "solomon"
-    else:
-        logger.warning("❌ Build failed → sending logs back to Critic.")
-        return "critic"
+
+    if build_attempts >= MAX_BUILD_RETRIES:
+        logger.warning(
+            "❌ Build failed after %d attempt(s) — giving up, moving to Solomon/Summary.",
+            build_attempts,
+        )
+        return "solomon"
+
+    logger.warning(
+        "❌ Build failed (attempt %d/%d) → sending logs back to Critic.",
+        build_attempts, MAX_BUILD_RETRIES,
+    )
+    return "critic"
 
 
 # ── Graph construction ─────────────────────────────────────────────────────
@@ -165,9 +193,12 @@ def run_workflow(
         "file_manifest": {},
         "plan": "",
         "issues": [],
+        "current_issues": [],
         "patches": [],
+        "last_patch_count": 0,
         "iteration": 0,
         "max_iterations": max_iterations,
+        "build_attempts": 0,
         "dockerfile": "",
         "dockerignore": "",
         "docker_build_log": "",

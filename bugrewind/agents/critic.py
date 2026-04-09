@@ -390,6 +390,7 @@ def critic_node(state: BugRewindState) -> dict:
 
     return {
         "issues": all_issues,          # Annotated[list, operator.add] → appended
-        "iteration": iteration,    # unchanged here; coder increments
+        "current_issues": all_issues,  # Latest batch only (overwritten, not accumulated)
+        "iteration": iteration,        # unchanged here; coder increments
         "logs": state.get("logs", "") + "\n" + log_entry,
     }

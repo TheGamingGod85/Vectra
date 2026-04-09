@@ -29,18 +29,20 @@ def validation_node(state: BugRewindState) -> dict:
     """
     repo_path = state["repo_path"]
     logs = state.get("logs", "")
+    build_attempts = state.get("build_attempts", 0) + 1
 
-    logger.info("🧪 Validation: building Docker image …")
+    logger.info("🧪 Validation: building Docker image (attempt %d) …", build_attempts)
 
     success, build_log = docker_build(context_path=repo_path)
 
     status = "build_success" if success else "build_failed"
-    log_entry = f"[Validation] docker build → {status}"
+    log_entry = f"[Validation] docker build (attempt {build_attempts}) → {status}"
     logger.info(log_entry)
 
     return {
         "docker_build_log": build_log,
         "docker_status": status,
+        "build_attempts": build_attempts,
         "logs": logs + "\n" + log_entry,
     }
 

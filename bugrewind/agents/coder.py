@@ -101,25 +101,55 @@ No markdown fences, no prose before or after.
 --- PATCHES (JSON array) ---
 """
 
-DOCKERFILE_PROMPT = """\
+DOCKERFILE_PROMPT_UV = """\
 You are BugRewind's Coder Agent.  Generate a minimal, production-ready
-Dockerfile for the following project.
+Dockerfile for a Python project that uses **uv** as its package manager.
 
-Requirements:
-- Use a slim/alpine base image where possible
-- Do NOT run as root (create a non-root user)
-- Pin the base image version
-- Copy only necessary files
-- Install dependencies properly
-- Set a proper ENTRYPOINT or CMD
+MANDATORY RULES for uv-based Dockerfiles:
+- Use `COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/` to get the uv binary
+  (do NOT curl/install uv — the multi-stage copy is much faster)
+- Base image: `python:3.13-slim` (or appropriate version)
+- COPY pyproject.toml and uv.lock FIRST, then run `uv sync --frozen --no-dev`
+- After syncing deps, COPY the rest of the source code
+- The CMD must use `uv run` prefix, e.g.: CMD ["uv", "run", "uvicorn", "main:app", ...]
+  (because uv installs into .venv, not globally — bare `uvicorn` won't work)
+- Do NOT create a non-root user (uv needs write access to .venv)
+- Do NOT copy .env into the image
 - Expose the correct port if it's a web app
-- If a .env file exists, do NOT copy it into the image (use runtime env vars)
 
 --- PROJECT SUMMARY ---
 {plan}
 
 --- KEY FILES ---
 {key_files}
+
+--- ENTRY POINT HINT ---
+{entry_hint}
+
+Output ONLY the Dockerfile content, no markdown fences, no explanation.
+"""
+
+DOCKERFILE_PROMPT_PIP = """\
+You are BugRewind's Coder Agent.  Generate a minimal, production-ready
+Dockerfile for a Python project that uses **pip** / requirements.txt.
+
+Requirements:
+- Base image: `python:3.13-slim` (or appropriate version)
+- COPY requirements.txt first, then `pip install --no-cache-dir -r requirements.txt`
+- Create a non-root user and switch to it
+- Pin the base image version
+- COPY only necessary files
+- Do NOT copy .env into the image
+- Expose the correct port if it's a web app
+
+--- PROJECT SUMMARY ---
+{plan}
+
+--- KEY FILES ---
+{key_files}
+
+--- ENTRY POINT HINT ---
+{entry_hint}
 
 Output ONLY the Dockerfile content, no markdown fences, no explanation.
 """
@@ -128,11 +158,225 @@ DOCKERIGNORE_PROMPT = """\
 Generate a .dockerignore file for a project with these files:
 {file_list}
 
-Include standard ignores (.git, __pycache__, node_modules, .env, venv, etc.)
+Include standard ignores (.git, __pycache__, node_modules, .env, venv, .venv,
+.bugrewind_backup, *.pyc, .mypy_cache, .pytest_cache, etc.)
 and anything else that should not be in a Docker image.
 
 Output ONLY the .dockerignore content, nothing else.
 """
+
+
+def _detect_entry_point(file_manifest: dict[str, str]) -> str:
+    """Try to detect the application entry point from the codebase."""
+    hints: list[str] = []
+
+    for fpath, content in file_manifest.items():
+        if not fpath.endswith(".py"):
+            continue
+
+        # FastAPI / Starlette
+        if "FastAPI()" in content or "Starlette(" in content:
+            # Find the variable name: app = FastAPI()
+            import re
+            m = re.search(r"(\w+)\s*=\s*FastAPI\(", content)
+            var_name = m.group(1) if m else "app"
+            module = fpath.replace("/", ".").replace(".py", "")
+            hints.append(f"FastAPI app: CMD [\"uvicorn\", \"{module}:{var_name}\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\"]")
+
+        # Flask
+        if "Flask(__name__)" in content:
+            module = fpath.replace("/", ".").replace(".py", "")
+            hints.append(f"Flask app: CMD [\"python\", \"{fpath}\"] or gunicorn")
+
+        # Django
+        if "django" in content.lower() and "wsgi" in content.lower():
+            hints.append("Django app: use gunicorn with wsgi")
+
+        # Simple script
+        if '__name__' in content and '__main__' in content:
+            hints.append(f"Script with __main__: CMD [\"python\", \"{fpath}\"]")
+
+    return "\n".join(hints) if hints else "Could not auto-detect entry point."
+
+
+def _generate_fallback_dockerfile_uv(
+    file_manifest: dict[str, str],
+    entry_hint: str,
+) -> str:
+    """Generate a known-good Dockerfile for uv-based projects.
+
+    Used as a fallback when the LLM output is bad.
+    """
+    # Detect FastAPI entry point
+    cmd_line = 'CMD ["uv", "run", "python", "main.py"]'
+    for fpath, content in file_manifest.items():
+        if "FastAPI()" in content:
+            import re
+            m = re.search(r"(\w+)\s*=\s*FastAPI\(", content)
+            var_name = m.group(1) if m else "app"
+            module = fpath.replace("/", ".").replace(".py", "")
+            cmd_line = f'CMD ["uv", "run", "uvicorn", "{module}:{var_name}", "--host", "0.0.0.0", "--port", "8000"]'
+            break
+
+    has_lock = "uv.lock" in file_manifest
+
+    lines = [
+        "FROM python:3.13-slim",
+        "",
+        "COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/",
+        "",
+        "WORKDIR /app",
+        "",
+        "COPY pyproject.toml ./",
+    ]
+    if has_lock:
+        lines.append("COPY uv.lock ./")
+
+    sync_flags = "--frozen --no-dev" if has_lock else "--no-dev"
+    lines += [
+        f"RUN uv sync {sync_flags} --no-install-project",
+        "",
+        "COPY . .",
+        f"RUN uv sync {sync_flags}",
+        "",
+        "EXPOSE 8000",
+        "",
+        cmd_line,
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def docker_gen_node(state: BugRewindState) -> dict:
+    """LangGraph node: Docker Generation.
+
+    Generates Dockerfile and .dockerignore if they don't already exist in the
+    target repo.  Detects the package manager and tailors the Dockerfile
+    accordingly (uv vs pip).  Also writes them to disk.
+    """
+    repo_path = state["repo_path"]
+    plan = state.get("plan", "")
+    file_manifest = state.get("file_manifest", {})
+
+    logs = state.get("logs", "")
+
+    # ── Detect package manager ─────────────────────────────────────────────
+    pkg_manager = _detect_package_manager(repo_path)
+    entry_hint = _detect_entry_point(file_manifest)
+    logger.info("📦 Docker Gen: detected package manager = %s", pkg_manager)
+
+    # ── Ensure uv.lock exists for uv projects ─────────────────────────────
+    if pkg_manager == "uv":
+        lock_path = Path(repo_path) / "uv.lock"
+        if not lock_path.exists():
+            logger.info("📦 Docker Gen: generating uv.lock via 'uv lock' …")
+            try:
+                result = subprocess.run(
+                    ["uv", "lock"],
+                    cwd=repo_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                )
+                if result.returncode == 0:
+                    logger.info("✅ uv lock succeeded")
+                    # Read the lock file into manifest
+                    if lock_path.exists():
+                        file_manifest["uv.lock"] = lock_path.read_text(
+                            encoding="utf-8", errors="replace"
+                        )
+                else:
+                    logger.warning("⚠️ uv lock failed: %s", result.stderr[:200])
+            except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
+                logger.warning("⚠️ uv lock error: %s", exc)
+
+    # ── Dockerfile ─────────────────────────────────────────────────────────
+    existing_dockerfile = file_manifest.get("Dockerfile", "")
+    if existing_dockerfile and "FROM" in existing_dockerfile:
+        logger.info("📦 Dockerfile already exists, keeping it.")
+        dockerfile = existing_dockerfile
+    else:
+        key_files = "\n".join(
+            f"- {p}" for p in sorted(file_manifest.keys())[:30]
+        )
+
+        # Select the right prompt based on package manager
+        if pkg_manager == "uv":
+            prompt = DOCKERFILE_PROMPT_UV.format(
+                plan=plan, key_files=key_files, entry_hint=entry_hint,
+            )
+        else:
+            prompt = DOCKERFILE_PROMPT_PIP.format(
+                plan=plan, key_files=key_files, entry_hint=entry_hint,
+            )
+
+        logger.info("📦 Docker Gen: generating Dockerfile …")
+        dockerfile = call_ollama(prompt)
+
+        # Strip markdown fences the LLM sometimes adds
+        dockerfile = dockerfile.strip()
+        if dockerfile.startswith("```"):
+            lines = dockerfile.splitlines()
+            dockerfile = "\n".join(lines[1:])
+        if dockerfile.endswith("```"):
+            dockerfile = dockerfile[: -len("```")].strip()
+
+        # ── Validate the LLM-generated Dockerfile ─────────────────────────
+        # For uv projects, check critical requirements
+        if pkg_manager == "uv":
+            problems: list[str] = []
+            if "curl" in dockerfile.lower() and "astral" in dockerfile.lower():
+                problems.append("Uses curl to install uv instead of COPY --from")
+            if '"uv", "run"' not in dockerfile and "'uv', 'run'" not in dockerfile:
+                if "uv run" not in dockerfile:
+                    problems.append("CMD doesn't use 'uv run' prefix")
+            if "COPY --from=" not in dockerfile and "/uv" not in dockerfile:
+                problems.append("Missing COPY --from=ghcr.io/astral-sh/uv for uv binary")
+
+            if problems:
+                logger.warning(
+                    "⚠️ LLM Dockerfile has issues: %s — using fallback.",
+                    "; ".join(problems),
+                )
+                dockerfile = _generate_fallback_dockerfile_uv(file_manifest, entry_hint)
+                logs += "\n[DockerGen] LLM Dockerfile rejected, using fallback."
+
+        apply_patch(repo_path, "Dockerfile", dockerfile)
+        logs += "\n[DockerGen] Generated Dockerfile."
+
+    # ── .dockerignore ──────────────────────────────────────────────────────
+    existing_dockerignore = file_manifest.get(".dockerignore", "")
+    if existing_dockerignore:
+        dockerignore = existing_dockerignore
+    else:
+        file_list = "\n".join(sorted(file_manifest.keys())[:50])
+        prompt = DOCKERIGNORE_PROMPT.format(file_list=file_list)
+        logger.info("📦 Docker Gen: generating .dockerignore …")
+        dockerignore = call_ollama(prompt)
+
+        dockerignore = dockerignore.strip()
+        if dockerignore.startswith("```"):
+            lines = dockerignore.splitlines()
+            dockerignore = "\n".join(lines[1:])
+        if dockerignore.endswith("```"):
+            dockerignore = dockerignore[: -len("```")].strip()
+
+        # Ensure critical entries are present
+        must_have = {".env", ".venv", "venv", "__pycache__", ".git", ".bugrewind_backup"}
+        existing_lines = set(dockerignore.splitlines())
+        missing = must_have - existing_lines
+        if missing:
+            dockerignore += "\n" + "\n".join(sorted(missing))
+
+        apply_patch(repo_path, ".dockerignore", dockerignore)
+        logs += "\n[DockerGen] Generated .dockerignore."
+
+    return {
+        "dockerfile": dockerfile,
+        "dockerignore": dockerignore,
+        "logs": logs,
+    }
+
 
 
 # ── Well-known Python import → pip package mapping ──────────────────────────
@@ -444,6 +688,27 @@ def _install_dependencies(
                 log_lines.append(f"  ⚠️ uv add {pkg_name} error: {exc}")
                 logger.warning("⚠️ uv add %s error: %s", pkg_name, exc)
 
+        # Run uv sync to ensure all deps (including existing ones) are installed
+        if installed:
+            logger.info("Running: uv sync in %s", repo_path)
+            try:
+                result = subprocess.run(
+                    ["uv", "sync"],
+                    cwd=repo_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                )
+                if result.returncode == 0:
+                    log_lines.append("  ✅ uv sync completed")
+                    logger.info("✅ uv sync completed")
+                else:
+                    log_lines.append(f"  ⚠️ uv sync failed: {result.stderr[:200]}")
+                    logger.warning("⚠️ uv sync failed: %s", result.stderr[:200])
+            except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
+                log_lines.append(f"  ⚠️ uv sync error: {exc}")
+                logger.warning("⚠️ uv sync error: %s", exc)
+
     elif pkg_manager in ("pip", "unknown"):
         # Update requirements.txt (or create it)
         req_path = Path(repo_path) / "requirements.txt"
@@ -519,25 +784,24 @@ def coder_node(state: BugRewindState) -> dict:
     and auto-installs any new dependencies introduced by the patches.
     Increments the iteration counter.
     """
-    issues = state.get("issues", [])
+    # Use current_issues (latest batch from critic), NOT the accumulated list
+    current_issues = state.get("current_issues", [])
     file_manifest = state.get("file_manifest", {})
     repo_path = state["repo_path"]
     iteration = state.get("iteration", 0)
 
-    if not issues:
+    if not current_issues:
         log_entry = "[Coder] No issues to fix.  Skipping."
         logger.info(log_entry)
         return {
             "patches": [],
+            "last_patch_count": 0,
             "iteration": iteration + 1,
             "logs": state.get("logs", "") + "\n" + log_entry,
         }
 
     # Save a snapshot of the current manifest for import diffing
     old_manifest = dict(file_manifest)
-
-    # Only fix the issues from the current iteration (last batch)
-    current_issues = issues  # in practice, we pass all; LLM deduplicates
 
     relevant_src = _get_relevant_files(file_manifest, current_issues)
 
@@ -622,6 +886,7 @@ def coder_node(state: BugRewindState) -> dict:
 
     return {
         "patches": applied_patches,
+        "last_patch_count": len(applied_patches),
         "file_manifest": file_manifest,
         "codebase": new_codebase,
         "iteration": iteration + 1,
