@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 OLLAMA_URL = "https://pvhd9wks-11434.inc1.devtunnels.ms/api/generate"
 DEFAULT_MODEL = "kimi-k2.5:cloud"
-REQUEST_TIMEOUT = 300.0  # seconds – local LLMs can be slow
+REQUEST_TIMEOUT = 500.0  # seconds – local LLMs can be slow
 
 
 def call_ollama(
