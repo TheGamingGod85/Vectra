@@ -360,15 +360,23 @@ def critic_node(state: BugRewindState) -> dict:
         prompt += docker_logs[:5_000]
 
     logger.info("🔍 Critic (iteration %d): LLM scanning for issues …", iteration)
-    raw = call_ollama(prompt)
 
-    # Log the raw response length for debugging
-    logger.debug("Critic LLM raw response length: %d chars", len(raw))
-    if not raw:
-        logger.warning("⚠️  Critic LLM returned EMPTY response — relying on static scan only.")
+    llm_issues: list[dict] = []
+    try:
+        raw = call_ollama(prompt)
 
-    llm_issues = _parse_issues(raw)
-    logger.info("🔍 Critic LLM found %d additional issue(s).", len(llm_issues))
+        # Log the raw response length for debugging
+        logger.debug("Critic LLM raw response length: %d chars", len(raw))
+        if not raw:
+            logger.warning("⚠️  Critic LLM returned EMPTY response — relying on static scan only.")
+
+        llm_issues = _parse_issues(raw)
+        logger.info("🔍 Critic LLM found %d additional issue(s).", len(llm_issues))
+    except Exception as exc:
+        logger.error(
+            "⚠️  Critic LLM call FAILED: %s — proceeding with static scan results only.",
+            exc,
+        )
 
     # ── Merge & deduplicate ───────────────────────────────────────────────
     all_issues = _deduplicate_issues(static_issues, llm_issues)

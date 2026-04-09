@@ -2,13 +2,16 @@
 BugRewind File Operations Utility.
 
 Handles reading an entire repository into a structured manifest,
-writing patches back to disk, and generating the final summary file.
+writing patches back to disk, creating pre-patch backups, and
+generating the final summary file.
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import shutil
+import datetime
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -40,6 +43,9 @@ SKIP_DIRS: set[str] = {
 
 MAX_FILE_SIZE = 100_000  # bytes – skip huge generated files
 
+# Track whether backup has been created for this run
+_backup_created_for: set[str] = set()
+
 
 def read_repo(repo_path: str) -> dict[str, str]:
     """Walk the repository tree and return a dict mapping relative paths to
@@ -67,6 +73,7 @@ def read_repo(repo_path: str) -> dict[str, str]:
         dirnames[:] = [
             d for d in dirnames
             if d not in SKIP_DIRS and not d.endswith(".egg-info")
+            and d != ".bugrewind_backup"  # Skip our own backup dirs
         ]
 
         for fname in filenames:
@@ -118,6 +125,55 @@ def build_codebase_text(manifest: dict[str, str]) -> str:
         parts.append(manifest[path])
         parts.append("=== END FILE ===\n")
     return "\n".join(parts)
+
+
+def create_backup(repo_path: str, file_manifest: dict[str, str]) -> str:
+    """Create a timestamped backup of all source files before patching.
+
+    Copies each file from ``file_manifest`` into a
+    ``<repo>/.bugrewind_backup/<timestamp>/`` directory, preserving the
+    relative directory structure.
+
+    This is called ONCE before the first patch is applied, and skipped
+    on subsequent calls within the same workflow run.
+
+    Args:
+        repo_path:      Absolute path to the repo root.
+        file_manifest:  Dict mapping relative paths to file contents.
+
+    Returns:
+        Absolute path to the backup directory.
+    """
+    resolved = str(Path(repo_path).resolve())
+
+    # Only create one backup per repo per process run
+    if resolved in _backup_created_for:
+        backup_dir = Path(resolved) / ".bugrewind_backup"
+        # Return the most recent subdirectory
+        existing = sorted(backup_dir.iterdir()) if backup_dir.exists() else []
+        if existing:
+            return str(existing[-1])
+        # Shouldn't happen, but fall through to create
+
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_dir = Path(repo_path) / ".bugrewind_backup" / timestamp
+    backup_dir.mkdir(parents=True, exist_ok=True)
+
+    copied = 0
+    for rel_path in sorted(file_manifest.keys()):
+        src = Path(repo_path) / rel_path
+        dst = backup_dir / rel_path
+        if src.exists():
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                shutil.copy2(str(src), str(dst))
+                copied += 1
+            except OSError as exc:
+                logger.warning("Could not backup %s: %s", rel_path, exc)
+
+    _backup_created_for.add(resolved)
+    logger.info("📂 Backup created: %s (%d files)", backup_dir, copied)
+    return str(backup_dir)
 
 
 def apply_patch(repo_path: str, file_path: str, new_content: str) -> None:
