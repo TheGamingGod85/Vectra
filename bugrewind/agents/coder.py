@@ -78,10 +78,10 @@ that fix each issue.
 
 ## Output Format
 
-For each fix, output a JSON object with:
+For EACH FILE that needs modification, output exactly ONE JSON object with:
   - "file": the relative file path to patch
-  - "description": what was changed and why (be specific)
-  - "new_content": the COMPLETE new content of the file after fixes
+  - "description": summary of ALL fixes applied to this file (be specific)
+  - "new_content": the COMPLETE new content of the file with all fixes applied
 
 If you need to create a `.env` file, include an entry with "file": ".env"
 and "new_content" containing all the extracted secrets in KEY=value format.
@@ -89,8 +89,8 @@ and "new_content" containing all the extracted secrets in KEY=value format.
 If you need to create a `.env.example` file (with placeholder values), include
 that too.
 
-Output a JSON array of these fix objects.  Output ONLY valid JSON, nothing else.
-No markdown fences, no prose before or after.
+Output a JSON array of these file objects. Combine ALL issues for a single file into ONE object! Do NOT output multiple objects for the same file.
+Output ONLY valid JSON inside a ```json block, nothing else. No prose.
 
 --- ISSUES TO FIX ---
 {issues}
@@ -812,8 +812,15 @@ def coder_node(state: BugRewindState) -> dict:
 
     logger.info("🔧 Coder (iteration %d): generating patches for %d issue(s) …",
                 iteration, len(current_issues))
-    raw = call_ollama(prompt)
+    raw = call_ollama(prompt, max_tokens=16384, json_mode=True)
     patches = _parse_patches(raw)
+
+    if not patches and raw.strip():
+        logger.warning(
+            "⚠️ Coder generated %d chars of text but parsing returned 0 patches! Output was likely truncated or malformed.",
+            len(raw)
+        )
+        logger.debug("Raw LLM output (first 2000 chars):\n%s", raw[:2000])
 
     # Apply patches to disk (with validation)
     applied_patches: list[dict] = []

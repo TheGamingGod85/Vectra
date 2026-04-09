@@ -19,7 +19,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 OLLAMA_URL = "http://172.16.17.61:11434/api/generate"
-DEFAULT_MODEL = "qwen3-coder-next:cloud"
+DEFAULT_MODEL = "kimi-k2.5:cloud"
 REQUEST_TIMEOUT = 500.0  # seconds – local LLMs can be slow
 
 # Retry configuration
@@ -44,6 +44,7 @@ def call_ollama(
     model: str = DEFAULT_MODEL,
     temperature: float = 0.2,
     max_tokens: int = 4096,
+    json_mode: bool = False,
 ) -> str:
     """Send a prompt to the local Ollama instance and return the full response.
 
@@ -56,6 +57,7 @@ def call_ollama(
         model:       Ollama model tag, e.g. ``"qwen3-coder-next:cloud"`` or ``"codellama"``.
         temperature: Sampling temperature.  Lower → more deterministic.
         max_tokens:  Maximum number of tokens to generate.
+        json_mode:   If True, forces the response to be valid JSON.
 
     Returns:
         The model's generated text as a plain string.
@@ -74,6 +76,8 @@ def call_ollama(
             "num_predict": max_tokens,
         },
     }
+    if json_mode:
+        payload["format"] = "json"
 
     logger.debug("Calling Ollama model=%s, prompt length=%d chars", model, len(prompt))
 
@@ -127,45 +131,15 @@ def call_ollama_json(
     Returns:
         Parsed JSON (dict or list).
     """
-    payload = {
-        "model": model,
-        "prompt": prompt,
-        "stream": False,
-        "format": "json",
-        "options": {
-            "temperature": temperature,
-            "num_predict": 4096,
-        },
-    }
-
     logger.debug("Calling Ollama (JSON mode) model=%s", model)
-
-    last_exc: Exception | None = None
-
-    for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            with httpx.Client(timeout=REQUEST_TIMEOUT) as client:
-                response = client.post(OLLAMA_URL, json=payload)
-                response.raise_for_status()
-
-            raw = response.json().get("response", "")
-
-            try:
-                return json.loads(raw)
-            except json.JSONDecodeError:
-                logger.warning("Ollama JSON decode failed, returning raw text in wrapper")
-                return {"raw": raw}
-
-        except Exception as exc:
-            last_exc = exc
-            if not _is_retryable(exc) or attempt == MAX_RETRIES:
-                raise
-
-            wait = RETRY_BACKOFF_BASE * (2 ** (attempt - 1))
-            logger.warning(
-                "⚠️  Ollama JSON call failed (attempt %d/%d): %s — retrying in %ds …",
-                attempt, MAX_RETRIES, exc, wait,
-            )
-            time.sleep(wait)
-
-    raise last_exc  # type: ignore[misc]
+    raw = call_ollama(
+        prompt,
+        model=model,
+        temperature=temperature,
+        json_mode=True,
+    )
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        logger.warning("Ollama JSON decode failed, returning raw text in wrapper")
+        return {"raw": raw}
