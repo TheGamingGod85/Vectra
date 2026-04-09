@@ -4,8 +4,9 @@ Orchestrator Agent – LangGraph Node.
 Entry point of the BugRewind workflow.  Responsibilities:
 
 1. Read and understand the target repository.
-2. Interpret the user's deployment intent.
-3. Produce a structured execution plan for downstream agents.
+2. Create a backup of the original codebase before any changes.
+3. Interpret the user's deployment intent.
+4. Produce a structured execution plan for downstream agents.
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ from __future__ import annotations
 import logging
 
 from bugrewind.graph.state import BugRewindState
-from bugrewind.utils.file_ops import read_repo, build_codebase_text
+from bugrewind.utils.file_ops import read_repo, build_codebase_text, create_backup
 from bugrewind.utils.llm import call_ollama
 
 logger = logging.getLogger(__name__)
@@ -46,8 +47,8 @@ Be concise.  Output ONLY the plan, no preamble.
 def orchestrator_node(state: BugRewindState) -> dict:
     """LangGraph node: Orchestrator.
 
-    Reads the repo, builds the codebase context, calls the LLM to produce an
-    execution plan, and populates the shared state.
+    Reads the repo, creates a backup, builds the codebase context, calls the
+    LLM to produce an execution plan, and populates the shared state.
     """
     repo_path = state["repo_path"]
     deploy_prompt = state.get("deploy_prompt", "Deploy this project securely via Docker.")
@@ -71,7 +72,11 @@ def orchestrator_node(state: BugRewindState) -> dict:
             "logs": state.get("logs", "") + "\n[Orchestrator] " + plan,
         }
 
-    # ── Step 2: Ask the LLM for an execution plan ─────────────────────────
+    # ── Step 2: Create a backup of the original codebase ───────────────────
+    backup_path = create_backup(repo_path, file_manifest)
+    logger.info("📂 Backup of original codebase at: %s", backup_path)
+
+    # ── Step 3: Ask the LLM for an execution plan ─────────────────────────
     prompt = ORCHESTRATOR_PROMPT.format(
         deploy_prompt=deploy_prompt,
         codebase=codebase[:30_000],  # cap to avoid blowing the context window
@@ -82,6 +87,7 @@ def orchestrator_node(state: BugRewindState) -> dict:
 
     log_entry = (
         f"[Orchestrator] Ingested {len(file_manifest)} files. "
+        f"Backup at {backup_path}. "
         f"Plan length: {len(plan)} chars."
     )
     logger.info(log_entry)
