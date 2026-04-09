@@ -6,7 +6,7 @@ BugRewind is an AI-powered secure deployment system using multi-agent orchestrat
 ## Tech Stack
 - **Language**: Python 3.11+
 - **Package Manager**: uv
-- **LLM**: Ollama API (llama3 or codellama)
+- **LLM**: Ollama API (kimi-k2.5:cloud or codellama)
 - **Agent Framework**: LangGraph
 - **MCP Server**: FastMCP
 - **Docker**: Docker CLI (subprocess)

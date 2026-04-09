@@ -18,7 +18,7 @@ uv run python -m bugrewind.mcp_server
 ## Prerequisites
 
 - Python 3.11+
-- [Ollama](https://ollama.ai) running locally with `llama3` model
+- [Ollama](https://ollama.ai) running locally with `kimi-k2.5:cloud` model
 - Docker CLI installed and available in PATH
 - uv package manager
 

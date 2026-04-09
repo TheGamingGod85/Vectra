@@ -10,7 +10,7 @@ Focus on **working multi-agent flow using LangGraph**, not theoretical design.
 
 * Python 3.11+
 * Package manager: uv
-* LLM: Ollama API (llama3 or codellama)
+* LLM: Ollama API (kimi-k2.5:cloud or codellama)
 * Agent framework: LangGraph (preferred) or LangChain
 * MCP Server: FastMCP
 * Docker CLI (subprocess)

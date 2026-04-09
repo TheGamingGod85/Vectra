@@ -14,8 +14,8 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-DEFAULT_MODEL = "llama3"
+OLLAMA_URL = "https://pvhd9wks-11434.inc1.devtunnels.ms/api/generate"
+DEFAULT_MODEL = "kimi-k2.5:cloud"
 REQUEST_TIMEOUT = 300.0  # seconds – local LLMs can be slow
 
 
@@ -32,7 +32,7 @@ def call_ollama(
 
     Args:
         prompt:      The full prompt text (system + user context baked in).
-        model:       Ollama model tag, e.g. ``"llama3"`` or ``"codellama"``.
+        model:       Ollama model tag, e.g. ``"kimi-k2.5:cloud"`` or ``"codellama"``.
         temperature: Sampling temperature.  Lower → more deterministic.
         max_tokens:  Maximum number of tokens to generate.
 

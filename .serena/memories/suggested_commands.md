@@ -40,7 +40,7 @@ bugrewind-mcp
 ```bash
 # Download from https://ollama.ai
 # Pull required model:
-ollama pull llama3
+ollama pull kimi-k2.5:cloud
 # or
 ollama pull codellama
 ```
@@ -151,7 +151,7 @@ docker logs <container-id>
 curl http://localhost:11434/api/tags
 
 # Test Ollama API
-curl http://localhost:11434/api/generate -d "{\"model\":\"llama3\",\"prompt\":\"test\"}"
+curl http://localhost:11434/api/generate -d "{\"model\":\"kimi-k2.5:cloud\",\"prompt\":\"test\"}"
 ```
 
 ### Check Python Environment
