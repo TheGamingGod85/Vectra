@@ -19,25 +19,189 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 
 from bugrewind.graph.state import BugRewindState
 from bugrewind.utils.llm import call_ollama
 
 logger = logging.getLogger(__name__)
 
+# ── Static pre-scan patterns ────────────────────────────────────────────────
+# These regex patterns catch common vulnerabilities that LLMs sometimes miss.
+# Each tuple: (pattern, category, severity, description)
+STATIC_PATTERNS: list[tuple[re.Pattern, str, str, str]] = [
+    (
+        re.compile(
+            r"""(?:password|passwd|secret|api_?key|token|auth)\s*=\s*["'][^"']{3,}["']""",
+            re.IGNORECASE,
+        ),
+        "Hardcoded Secret",
+        "critical",
+        "Hardcoded credential or secret found. Use environment variables instead.",
+    ),
+    (
+        re.compile(
+            r"""(?:DB_PASSWORD|DATABASE_URL|SECRET_KEY|JWT_SECRET|API_KEY|AWS_SECRET)\s*=\s*["'][^"']+["']""",
+            re.IGNORECASE,
+        ),
+        "Hardcoded Environment Variable",
+        "critical",
+        "Sensitive environment variable is hardcoded instead of being loaded from .env or OS environment.",
+    ),
+    (
+        re.compile(
+            r"""os\.environ\s*\[\s*["'][^"']+["']\s*\]""",
+        ),
+        "Unsafe Env Access",
+        "medium",
+        "Using os.environ[] without .get() — will crash if the variable is not set.",
+    ),
+    (
+        re.compile(
+            r"""subprocess\.(?:call|run|Popen)\s*\(\s*(?:f["']|["'].*\{|.*\+\s*(?:input|request))""",
+            re.IGNORECASE,
+        ),
+        "Command Injection",
+        "critical",
+        "Shell command built from user input or f-string without sanitisation.",
+    ),
+    (
+        re.compile(
+            r"""(?:execute|cursor\.execute)\s*\(\s*(?:f["']|["'].*%s|.*\.format\(|.*\+\s*)""",
+            re.IGNORECASE,
+        ),
+        "SQL Injection",
+        "critical",
+        "SQL query built via string concatenation/formatting instead of parameterised queries.",
+    ),
+    (
+        re.compile(
+            r"""open\s*\(\s*(?:request\.|f["']|.*\+\s*(?:input|request|user))""",
+            re.IGNORECASE,
+        ),
+        "Path Traversal",
+        "high",
+        "File opened using unsanitised user input — potential path traversal.",
+    ),
+    (
+        re.compile(
+            r"""(?:md5|sha1)\s*\(""",
+            re.IGNORECASE,
+        ),
+        "Weak Hashing",
+        "high",
+        "Using weak hash algorithm (MD5/SHA1) — use bcrypt/argon2 for passwords, SHA-256+ for integrity.",
+    ),
+    (
+        re.compile(
+            r"""\.password\s*==\s*|==\s*.*\.password""",
+        ),
+        "Plaintext Password Comparison",
+        "critical",
+        "Direct string comparison of passwords instead of using a secure hash comparison.",
+    ),
+    (
+        re.compile(
+            r"""debug\s*=\s*True""",
+            re.IGNORECASE,
+        ),
+        "Debug Mode Enabled",
+        "high",
+        "Debug mode is enabled — must be disabled in production.",
+    ),
+    (
+        re.compile(
+            r"""CORS.*\*|allow_origins\s*=\s*\[?\s*["']\*["']""",
+            re.IGNORECASE,
+        ),
+        "Permissive CORS",
+        "high",
+        "CORS allows all origins (*) — restrict to specific domains in production.",
+    ),
+    (
+        re.compile(
+            r"""(?:verify\s*=\s*False|VERIFY_SSL\s*=\s*False)""",
+            re.IGNORECASE,
+        ),
+        "SSL Verification Disabled",
+        "high",
+        "SSL certificate verification is disabled — vulnerable to MITM attacks.",
+    ),
+]
+
+# Files to skip during static scan (test files, configs, etc.)
+STATIC_SCAN_SKIP_PATTERNS = re.compile(
+    r"(?:test_|_test\.|\.test\.|spec\.|__pycache__|node_modules|\.lock$|\.md$)",
+    re.IGNORECASE,
+)
+
+
+def _static_prescan(file_manifest: dict[str, str]) -> list[dict]:
+    """Run regex-based static analysis across all source files.
+
+    Returns a list of issue dicts in the same format the LLM produces.
+    """
+    issues: list[dict] = []
+    issue_id = 1
+
+    for fpath, content in sorted(file_manifest.items()):
+        # Skip test / non-code files
+        if STATIC_SCAN_SKIP_PATTERNS.search(fpath):
+            continue
+
+        for pattern, category, severity, description in STATIC_PATTERNS:
+            for match in pattern.finditer(content):
+                # Extract a snippet: the matching line ± 1 line of context
+                line_start = content.rfind("\n", 0, match.start()) + 1
+                line_end = content.find("\n", match.end())
+                if line_end == -1:
+                    line_end = len(content)
+                snippet = content[line_start:line_end].strip()
+
+                # Avoid duplicate issues for the same pattern in the same file
+                already_exists = any(
+                    i.get("file") == fpath
+                    and i.get("category") == category
+                    and i.get("snippet", "").strip() == snippet
+                    for i in issues
+                )
+                if already_exists:
+                    continue
+
+                issues.append({
+                    "id": issue_id,
+                    "severity": severity,
+                    "category": category,
+                    "file": fpath,
+                    "snippet": snippet[:200],
+                    "description": description,
+                    "recommendation": f"Fix the {category.lower()} issue in {fpath}.",
+                    "source": "static_scan",
+                })
+                issue_id += 1
+
+    return issues
+
+
 CRITIC_PROMPT = """\
-You are BugRewind's Critic Agent — a ruthless application security auditor.
+You are BugRewind's Critic Agent — a ruthless, thorough application security auditor.
 
 You are given:
 1. The execution plan from the Orchestrator.
 2. The full codebase of the target project.
 3. Any previous patches that have been applied.
+4. Issues already found by a static scanner (your job is to find ADDITIONAL issues the scanner missed).
 
-Your mission: find ALL security vulnerabilities, quality issues, and deployment
-gaps.  Be thorough but precise — every finding MUST reference a specific file
-and include a short code snippet.
+IMPORTANT RULES:
+- You MUST find vulnerabilities. Real-world codebases almost always have security issues.
+- Look for: hardcoded secrets/passwords, SQL injection, path traversal, XSS, CSRF, command injection,
+  insecure deserialization, plaintext password storage, missing input validation, debug mode left on,
+  permissive CORS, missing rate limiting, insecure dependencies, missing HTTPS enforcement,
+  improper error handling that leaks stack traces, and missing authentication/authorization checks.
+- NEVER return an empty array unless the code is genuinely flawless after careful analysis.
+- If you are uncertain, LIST the potential issue — false positives are better than missing a real vulnerability.
 
-For each finding, output a JSON object on its own line with these keys:
+For each finding, output a JSON object with these keys:
   - "id": sequential integer starting at 1
   - "severity": "critical" | "high" | "medium" | "low"
   - "category": short label (e.g. "SQL Injection", "Hardcoded Secret")
@@ -46,9 +210,7 @@ For each finding, output a JSON object on its own line with these keys:
   - "description": concise explanation of the vulnerability
   - "recommendation": how to fix it
 
-Output a JSON array of these objects.  Output ONLY the JSON array, nothing else.
-
-If there are no remaining issues, output an empty JSON array: []
+Output a JSON array of these objects. Output ONLY the JSON array, no prose, no markdown fences.
 
 --- PLAN ---
 {plan}
@@ -59,7 +221,10 @@ If there are no remaining issues, output an empty JSON array: []
 --- PREVIOUS PATCHES APPLIED ---
 {patches}
 
---- FINDINGS (JSON array) ---
+--- ISSUES ALREADY FOUND BY STATIC SCANNER ---
+{static_issues}
+
+Find additional issues the static scanner missed. Output ONLY a JSON array:
 """
 
 
@@ -69,8 +234,22 @@ def _parse_issues(raw: str) -> list[dict]:
     The model should return a JSON array, but we handle common failures:
     - Leading/trailing prose around the JSON
     - Individual JSON objects separated by newlines
+    - Markdown code fences wrapping the JSON
     """
     raw = raw.strip()
+
+    if not raw:
+        logger.warning("Critic LLM returned empty response — no issues parsed from LLM.")
+        return []
+
+    # Strip markdown code fences if present
+    if raw.startswith("```"):
+        lines = raw.splitlines()
+        # Remove first line (```json or ```)
+        lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        raw = "\n".join(lines).strip()
 
     # Try direct parse first
     try:
@@ -107,16 +286,58 @@ def _parse_issues(raw: str) -> list[dict]:
     return issues
 
 
+def _deduplicate_issues(
+    static_issues: list[dict],
+    llm_issues: list[dict],
+) -> list[dict]:
+    """Merge static and LLM issues, removing duplicates.
+
+    Two issues are considered duplicates if they share the same file AND
+    category (case-insensitive).
+    """
+    seen: set[tuple[str, str]] = set()
+    merged: list[dict] = []
+
+    for issue in static_issues + llm_issues:
+        key = (
+            issue.get("file", "").lower(),
+            issue.get("category", "").lower(),
+        )
+        if key not in seen:
+            seen.add(key)
+            merged.append(issue)
+
+    # Re-number IDs
+    for i, issue in enumerate(merged, 1):
+        issue["id"] = i
+
+    return merged
+
+
 def critic_node(state: BugRewindState) -> dict:
     """LangGraph node: Critic.
 
-    Analyses the codebase and returns accumulated issues.
+    Analyses the codebase using a two-phase approach:
+    1. Static regex-based pre-scan for common vulnerability patterns.
+    2. LLM-based deep analysis for issues the static scanner can't catch.
+
+    Returns accumulated issues from both phases.
     """
     plan = state.get("plan", "")
     codebase = state.get("codebase", "")
+    file_manifest = state.get("file_manifest", {})
     patches = state.get("patches", [])
     iteration = state.get("iteration", 0)
 
+    # ── Phase 1: Static pre-scan ──────────────────────────────────────────
+    static_issues: list[dict] = []
+    if iteration == 0 and file_manifest:
+        static_issues = _static_prescan(file_manifest)
+        logger.info(
+            "🔍 Critic static pre-scan: found %d issue(s).", len(static_issues)
+        )
+
+    # ── Phase 2: LLM deep analysis ────────────────────────────────────────
     # Include docker build/run logs if we're in a validation-retry loop
     docker_logs = ""
     if state.get("docker_build_log"):
@@ -125,24 +346,42 @@ def critic_node(state: BugRewindState) -> dict:
         docker_logs += f"\n--- DOCKER RUN LOG ---\n{state['docker_run_log']}"
 
     patches_text = json.dumps(patches, indent=2) if patches else "None"
+    static_issues_text = (
+        json.dumps(static_issues, indent=2) if static_issues else "None"
+    )
 
     prompt = CRITIC_PROMPT.format(
         plan=plan,
         codebase=codebase[:30_000],
         patches=patches_text[:5_000],
+        static_issues=static_issues_text[:5_000],
     )
     if docker_logs:
         prompt += docker_logs[:5_000]
 
-    logger.info("🔍 Critic (iteration %d): scanning for issues …", iteration)
+    logger.info("🔍 Critic (iteration %d): LLM scanning for issues …", iteration)
     raw = call_ollama(prompt)
-    issues = _parse_issues(raw)
 
-    log_entry = f"[Critic][iter={iteration}] Found {len(issues)} issue(s)."
+    # Log the raw response length for debugging
+    logger.debug("Critic LLM raw response length: %d chars", len(raw))
+    if not raw:
+        logger.warning("⚠️  Critic LLM returned EMPTY response — relying on static scan only.")
+
+    llm_issues = _parse_issues(raw)
+    logger.info("🔍 Critic LLM found %d additional issue(s).", len(llm_issues))
+
+    # ── Merge & deduplicate ───────────────────────────────────────────────
+    all_issues = _deduplicate_issues(static_issues, llm_issues)
+
+    log_entry = (
+        f"[Critic][iter={iteration}] "
+        f"Static: {len(static_issues)}, LLM: {len(llm_issues)}, "
+        f"Total (deduped): {len(all_issues)} issue(s)."
+    )
     logger.info(log_entry)
 
     return {
-        "issues": issues,          # Annotated[list, operator.add] → appended
+        "issues": all_issues,          # Annotated[list, operator.add] → appended
         "iteration": iteration,    # unchanged here; coder increments
         "logs": state.get("logs", "") + "\n" + log_entry,
     }

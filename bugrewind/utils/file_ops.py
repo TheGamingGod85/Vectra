@@ -137,15 +137,25 @@ def apply_patch(repo_path: str, file_path: str, new_content: str) -> None:
 
 
 def write_summary(repo_path: str, summary_md: str) -> str:
-    """Write the final summary markdown to ``outputs/summary.md`` inside
-    the BugRewind project directory (NOT in the target repo).
+    """Write the final summary markdown to both the BugRewind ``outputs/``
+    directory AND the target repository root.
 
     Returns:
-        Absolute path to the written summary file.
+        Absolute path to the summary file inside the target repository.
     """
+    # ── Write to BugRewind's own outputs directory ────────────────────────
     out_dir = Path(__file__).resolve().parent.parent / "outputs"
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / "summary.md"
-    out_path.write_text(summary_md, encoding="utf-8")
-    logger.info("Summary written to %s", out_path)
-    return str(out_path)
+    internal_path = out_dir / "summary.md"
+    internal_path.write_text(summary_md, encoding="utf-8")
+    logger.info("Summary written to %s", internal_path)
+
+    # ── Write to the target repository root ───────────────────────────────
+    repo_summary_path = Path(repo_path) / "BUGREWIND_SUMMARY.md"
+    try:
+        repo_summary_path.write_text(summary_md, encoding="utf-8")
+        logger.info("Summary also written to %s", repo_summary_path)
+    except OSError as exc:
+        logger.warning("Could not write summary to target repo: %s", exc)
+
+    return str(repo_summary_path)
