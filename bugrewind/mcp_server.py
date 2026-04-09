@@ -1,0 +1,68 @@
+"""
+BugRewind MCP Server.
+
+Exposes the entire BugRewind multi-agent workflow as a single MCP tool
+using FastMCP.  Any MCP-compatible client (Claude Desktop, Gemini, etc.)
+can call ``orchestrator_tool`` to scan, fix, and deploy a local repo.
+"""
+
+from __future__ import annotations
+
+import logging
+from fastmcp import FastMCP
+
+from bugrewind.graph.workflow import run_workflow
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+mcp = FastMCP(name="BugRewind")
+
+
+@mcp.tool
+def orchestrator_tool(repo_path: str, deploy_prompt: str) -> str:
+    """Run the full BugRewind pipeline on a local repository.
+
+    This tool:
+    1. Initialises the LangGraph multi-agent workflow.
+    2. Scans the codebase for vulnerabilities and quality issues.
+    3. Iteratively applies targeted fixes (Critic ↔ Coder loop).
+    4. Generates Dockerfile and .dockerignore.
+    5. Builds and validates the Docker image.
+    6. Deploys the container locally.
+    7. Returns a markdown summary of everything that happened.
+
+    Args:
+        repo_path:     Absolute path to the target repository on disk.
+        deploy_prompt: Free-form deployment instructions / user intent,
+                       e.g. "Deploy this FastAPI app with security hardening".
+
+    Returns:
+        A markdown summary including issues found, patches applied,
+        Docker status, and the final deployment result.
+    """
+    logger.info("MCP orchestrator_tool called: repo=%s", repo_path)
+
+    try:
+        final_state = run_workflow(
+            repo_path=repo_path,
+            deploy_prompt=deploy_prompt,
+            max_iterations=3,
+        )
+        return final_state.get("summary", "No summary generated.")
+    except Exception as exc:
+        logger.exception("Workflow failed")
+        return f"❌ BugRewind workflow failed:\n\n{exc}"
+
+
+def run_server() -> None:
+    """Entry point for ``bugrewind-mcp`` console script."""
+    logger.info("Starting BugRewind MCP server …")
+    mcp.run()
+
+
+if __name__ == "__main__":
+    run_server()
