@@ -10,17 +10,23 @@ from __future__ import annotations
 
 import logging
 import sys
-from fastmcp import FastMCP
+import os
 
+# Force silence for potentially noisy libraries
+os.environ["FASTMCP_LOG_LEVEL"] = "ERROR"
+
+from fastmcp import FastMCP
 from bugrewind.graph.workflow import run_workflow
 
+# Configure logging to strictly use stderr
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.ERROR,  # Higher level to be safe
     format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
     stream=sys.stderr,
 )
 logger = logging.getLogger(__name__)
 
+# Initialize FastMCP
 mcp = FastMCP(name="BugRewind")
 
 

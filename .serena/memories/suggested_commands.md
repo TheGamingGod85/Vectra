@@ -7,7 +7,17 @@
 uv sync
 ```
 
-### Run Against Target Repository
+### Interactive Launcher (Recommended)
+```bash
+uv run python start.py
+```
+This provides a menu-driven interface to choose between:
+1. GUI Dashboard (Interactive Web UI)
+2. CLI Automation (Headless terminal scan)
+3. MCP Server (Protocol for AI Assistants)
+4. Exit
+
+### Run Against Target Repository (CLI)
 ```bash
 uv run python -m bugrewind.main /path/to/repo --prompt "Deploy securely"
 ```
@@ -117,6 +127,9 @@ mkdir dirname
 
 # Remove directory
 rmdir dirname
+
+# Remove directory recursively
+rmdir /s /q dirname
 ```
 
 ### Git Commands
@@ -227,3 +240,138 @@ del package-lock.json
 rmdir /s /q node_modules
 npm install
 ```
+
+### MCP Server Issues
+```bash
+# Test MCP server connection
+# The MCP server communicates via stdio, so testing requires an MCP client
+# Common clients: Claude Desktop, Cursor, etc.
+
+# Check if server starts without errors
+uv run python -m bugrewind.mcp_server
+```
+
+## Development Workflow
+
+### Typical Development Cycle
+```bash
+# 1. Make code changes
+# 2. Run tests (if applicable)
+# 3. Test with a sample repository
+uv run python -m bugrewind.main /path/to/test/repo --prompt "test"
+
+# 4. Test dashboard
+uv run python -m bugrewind.gui
+
+# 5. Test MCP server
+uv run python -m bugrewind.mcp_server
+```
+
+### Debugging with Verbose Logging
+```bash
+# Enable DEBUG level logging
+uv run python -m bugrewind.main /path/to/repo --prompt "test" --verbose
+```
+
+### Testing Specific Agents
+```bash
+# You can test individual agents by modifying the workflow
+# or by creating test scripts that call specific nodes directly
+```
+
+## Project-Specific Commands
+
+### Check Backup Directory
+```bash
+# The Orchestrator creates a backup before modifications
+# Check for backup directory in the target repository
+dir /a /b | findstr "backup"
+```
+
+### View Generated Summary
+```bash
+# After workflow completion, view the summary
+type outputs\summary.md
+```
+
+### Check Generated Docker Files
+```bash
+# View generated Dockerfile
+type Dockerfile
+
+# View generated .dockerignore
+type .dockerignore
+
+# View generated .env file (if secrets were found)
+type .env
+```
+
+## Performance Optimization
+
+### Clean Docker Resources
+```bash
+# Remove unused images
+docker image prune
+
+# Remove all unused resources
+docker system prune -a
+
+# Remove stopped containers
+docker container prune
+```
+
+### Clean Python Cache
+```bash
+# Remove __pycache__ directories
+for /d /r . %d in (__pycache__) do @if exist "%d" rd /s /q "%d"
+
+# Remove .pyc files
+del /s /q *.pyc
+```
+
+## Environment Variables
+
+### Setting Environment Variables (Windows CMD)
+```bash
+# Set Ollama URL (if not default)
+set OLLAMA_URL=http://localhost:11434
+
+# Set log level
+set LOG_LEVEL=DEBUG
+```
+
+### Setting Environment Variables (Windows PowerShell)
+```powershell
+# Set Ollama URL (if not default)
+$env:OLLAMA_URL="http://localhost:11434"
+
+# Set log level
+$env:LOG_LEVEL="DEBUG"
+```
+
+## Quick Reference
+
+### Entry Points Summary
+| Command | Purpose |
+|---------|---------|
+| `uv run python start.py` | Interactive menu launcher |
+| `uv run python -m bugrewind.main` | CLI automation |
+| `uv run python -m bugrewind.mcp_server` | MCP server |
+| `uv run python -m bugrewind.gui` | GUI dashboard |
+| `bugrewind` | Installed CLI script |
+| `bugrewind-mcp` | Installed MCP script |
+
+### Common Flags
+| Flag | Description |
+|------|-------------|
+| `--prompt` | Deployment instructions |
+| `--max-iter` | Maximum Critic-Coder iterations |
+| `--verbose`, `-v` | Enable DEBUG logging |
+
+### Default Values
+- Default prompt: "Deploy this project securely via Docker."
+- Default max iterations: 3
+- Default log level: INFO
+- Backend port: 8000
+- Frontend port: 3000
+- Ollama URL: http://localhost:11434
