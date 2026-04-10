@@ -19,6 +19,8 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+import markdown
+
 from watcher.state import WatcherState
 
 logger = logging.getLogger(__name__)
@@ -35,7 +37,7 @@ def _build_infrastructure_email(state: WatcherState) -> tuple[str, str]:
         ``(subject, html_body)``
     """
     container_id = state["container_id"]
-    diagnostic_report = state["diagnostic_report"]
+    diagnostic_report = markdown.markdown(state["diagnostic_report"])
 
     subject = (
         f"[RewindWatcher Alert] Container {container_id} crashed "
@@ -54,7 +56,7 @@ def _build_infrastructure_email(state: WatcherState) -> tuple[str, str]:
 
 <div style="padding: 24px;">
     <h2 style="color: #ff6b35; border-bottom: 2px solid #ff6b35; padding-bottom: 8px;">Diagnostic Report</h2>
-    <pre style="background: #f8f9fa; padding: 16px; border-radius: 6px; overflow-x: auto; font-size: 13px; line-height: 1.5;">{diagnostic_report}</pre>
+    <div style="background: #f8f9fa; padding: 16px; border-radius: 6px; font-size: 14px; line-height: 1.6;">{diagnostic_report}</div>
 
     <div style="margin-top: 24px; padding: 16px; background: #fff3e0; border-left: 4px solid #ff6b35; border-radius: 4px;">
         <strong>🔧 Action Required:</strong>
@@ -83,8 +85,8 @@ def _build_source_code_email(state: WatcherState) -> tuple[str, str]:
         ``(subject, html_body)``
     """
     container_id = state["container_id"]
-    diagnostic_report = state["diagnostic_report"]
-    fix_recommendation = state["fix_recommendation"]
+    diagnostic_report = markdown.markdown(state["diagnostic_report"])
+    fix_recommendation = markdown.markdown(state["fix_recommendation"])
     container_logs = state["container_logs"]
     repo_path = state["repo_path"]
 
@@ -104,12 +106,12 @@ def _build_source_code_email(state: WatcherState) -> tuple[str, str]:
 
 <div style="padding: 24px;">
     <h2 style="color: #e63946; border-bottom: 2px solid #e63946; padding-bottom: 8px;">Diagnostic Report</h2>
-    <pre style="background: #f8f9fa; padding: 16px; border-radius: 6px; overflow-x: auto; font-size: 13px; line-height: 1.5;">{diagnostic_report}</pre>
+    <div style="background: #f8f9fa; padding: 16px; border-radius: 6px; font-size: 14px; line-height: 1.6;">{diagnostic_report}</div>
 
     <h2 style="color: #2a9d8f; border-bottom: 2px solid #2a9d8f; padding-bottom: 8px; margin-top: 32px;">
         💡 Fix Recommendation
     </h2>
-    <pre style="background: #f0fdf4; padding: 16px; border-radius: 6px; overflow-x: auto; font-size: 13px; line-height: 1.5;">{fix_recommendation}</pre>
+    <div style="background: #f0fdf4; padding: 16px; border-radius: 6px; font-size: 14px; line-height: 1.6;">{fix_recommendation}</div>
 
     <h2 style="color: #457b9d; border-bottom: 2px solid #457b9d; padding-bottom: 8px; margin-top: 32px;">
         📜 Container Log Trace

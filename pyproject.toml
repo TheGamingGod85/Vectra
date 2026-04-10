@@ -16,6 +16,7 @@ dependencies = [
     "websockets>=16.0",
     "python-multipart>=0.0.24",
     "docker>=7.0.0",
+    "markdown>=3.10.2",
 ]
 
 [project.scripts]
