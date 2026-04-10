@@ -9,70 +9,32 @@ BugRewind is an AI-powered secure deployment system using multi-agent orchestrat
 - **LLM**: Ollama API (kimi-k2.5:cloud or codellama)
 - **Agent Framework**: LangGraph
 - **MCP Server**: FastMCP
-- **Docker**: Docker CLI (subprocess)
+- **Docker**: Docker SDK (for monitoring) and Docker CLI (for deployments)
+- **Database**: SQLite (for monitoring state)
 - **Web Dashboard**: FastAPI + React/Vite
-- **Dependencies**: langgraph, langchain-core, langchain-ollama, fastmcp, httpx, pydantic, fastapi, uvicorn, websockets, python-multipart
-- **Frontend**: React 18.2.0, Vite 4.4.5, lucide-react 0.284.0, react-markdown 10.1.0, remark-gfm 4.0.1
+- **Dependencies**: langgraph, langchain-core, langchain-ollama, fastmcp, httpx, pydantic, fastapi, uvicorn, websockets, python-multipart, docker
 
 ## Architecture
-LangGraph-based multi-agent workflow with the following agents:
+LangGraph-based multi-agent orchestration comprising two main services:
 
-1. **Orchestrator Agent**: Entry point that understands repo + user intent, creates execution plan, creates backup of original codebase
-2. **Critic Agent**: Security + quality reviewer that detects vulnerabilities (secrets, unsafe shell usage, dependency risks, missing Dockerfile, OWASP-style flaws). Uses both static regex patterns and LLM analysis.
-3. **Coder Agent**: Applies fixes based on critic findings (does NOT rewrite entire repo), generates Dockerfile and .dockerignore when missing
-4. **Solomon Agent**: Execution agent that runs shell commands, executes Docker (build, run, validation), and deploys to Vercel via the Vercel CLI
+### 1. BugRewind Deployment Service
+The main workflow for securing and deploying applications.
+- **Orchestrator Agent**: Entry point, creates execution plan and backups.
+- **Critic Agent**: Security reviewer (static patterns + LLM).
+- **Coder Agent**: Applies patches and generates Docker/Vercel configs.
+- **Solomon Agent**: Execution engine (Docker/Vercel builds and runs). Now includes a hook to register successful deployments in the monitoring database.
+
+### 2. RewindWatcher Monitoring Service (`watcher/`)
+A standalone background daemon for post-mortem diagnostics.
+- **monitor.py**: Polling loop (10-min interval) that tracks container health via Docker SDK.
+- **Forensics Workflow**: Triggered upon crash detection.
+    - **PM Critic Agent**: Root cause analyst (infrastructure vs. source code).
+    - **PM Coder Agent**: Solution architect, formulates fix recommendations.
+    - **Dispatcher**: Notifies users via rich HTML emails (SMTP).
 
 ## Deployment Targets
-The workflow supports two deployment pipelines, selected automatically from the user's prompt or explicitly via `--target`:
-
-### Docker path (default)
-```
-START → Orchestrator → Critic → Coder → Critic (loop)
-      → Docker Gen → Validation → [pass?] → Solomon → Summary → END
-                                 ↘ [fail?] → Critic (re-analyse, max 2 retries)
-```
-
-### Vercel path (when user mentions vercel/serverless/cloud)
-```
-START → Orchestrator → Critic → Coder → Critic (loop)
-      → Vercel Setup → Vercel Deploy → Summary → END
-```
-
-The Critic-Coder loop continues until:
-- No issues remain, OR
-- `max_iterations` is reached, OR
-- The coder is stuck (applied 0 patches with issues remaining)
-
-After Docker build fails, the error logs are fed back to the Critic for up to 2 re-analysis attempts (MAX_BUILD_RETRIES = 2).
-
-## State Management
-Uses `BugRewindState` TypedDict with fields:
-- `repo_path`: Absolute path to the target repository on disk
-- `deploy_prompt`: Free-form user intent / deployment instructions
-- `deploy_target`: Deployment backend — `"docker"` (default) or `"vercel"`. Auto-detected from prompt.
-- `codebase`: Concatenated source code text ingested from the repo
-- `file_manifest`: Mapping of relative file path → file content for targeted patching
-- `plan`: Structured execution plan produced by the Orchestrator
-- `issues`: Accumulated list of vulnerability / quality findings (uses operator.add reducer)
-- `current_issues`: The LATEST batch of issues from the most recent Critic run
-- `patches`: Accumulated list of code patches produced by the Coder (uses operator.add reducer)
-- `last_patch_count`: Number of patches successfully applied in the most recent Coder run
-- `iteration`: Current critic↔coder loop iteration (0-indexed)
-- `max_iterations`: Upper bound on how many critic↔coder loops to run
-- `build_attempts`: Number of Docker build attempts so far (capped at MAX_BUILD_RETRIES)
-- `dockerfile`: Generated Dockerfile content
-- `dockerignore`: Generated .dockerignore content
-- `docker_build_log`: Stdout/stderr from `docker build`
-- `docker_run_log`: Stdout/stderr from `docker run`
-- `docker_status`: High-level status string, e.g. "success", "build_failed"
-- `vercel_json`: Generated vercel.json content
-- `vercel_deploy_url`: The URL returned by `vercel deploy`
-- `vercel_deploy_log`: Stdout/stderr from the Vercel CLI
-- `vercel_status`: High-level status string, e.g. "deployed", "deploy_failed"
-- `logs`: Human-readable running log of all agent activity
-- `summary`: Final markdown summary written to outputs/summary.md
-
-Issues and patches use `operator.add` reducer for accumulation.
+- **Docker**: (Default) Iterative validation loop (max 2 build retries).
+- **Vercel**: Serverless deployment for FastAPI/Python projects.
 
 ## Project Structure
 ```
@@ -80,99 +42,33 @@ bugrewind/
 ├── main.py              # CLI entry point
 ├── mcp_server.py        # MCP server entry point
 ├── dashboard_api.py     # FastAPI backend for dashboard
-├── gui.py               # GUI launcher (starts backend + frontend)
-├── graph/
-│   ├── state.py         # BugRewindState TypedDict
-│   └── workflow.py      # LangGraph workflow definition
-├── agents/
-│   ├── orchestrator.py  # Entry point agent
-│   ├── critic.py        # Security/quality reviewer (static patterns + LLM)
-│   ├── coder.py         # Applies fixes, generates Docker configs
-│   └── solomon.py       # Execution agent (Docker)
-├── tools/
-│   └── docker_tools.py  # Docker CLI wrappers
-├── utils/
-│   ├── llm.py           # Ollama API wrapper
-│   └── file_ops.py      # File operations (read_repo, apply_patch, create_backup)
-├── dashboard/           # React/Vite frontend
-│   ├── package.json
-│   ├── vite.config.js
-│   └── src/
-│       ├── App.jsx
-│       ├── main.jsx
-│       └── index.css
-└── outputs/
-    └── summary.md       # Generated summary
+├── gui.py               # GUI launcher
+├── graph/               # Deployment workflow
+├── agents/              # Deployment agents
+├── tools/               # Subprocess wrappers (Docker/Vercel)
+└── utils/               # File Ops, LLM, and DB utility
+    ├── db.py            # SQLite management for monitoring
+
+watcher/                 # RewindWatcher service
+├── monitor.py           # Daemon entry point
+├── graph.py             # Forensics workflow definition
+├── agents.py            # Post-mortem analysis nodes
+├── state.py             # WatcherState definition
+└── notifier.py          # SMTP email dispatcher
+
+dashboard/               # React/Vite frontend
+outputs/                 # Deployment summaries
+monitored_containers.sqlite # Database tracking active containers
 ```
 
 ## Key Design Patterns
-- Each agent is a distinct LangGraph node
-- State travels through the entire workflow
-- Clear separation of responsibilities
-- Iterative improvement loop between Critic and Coder
-- Docker validation before final deployment
-- Build failure retry mechanism (max 2 retries)
-- WebSocket-based real-time dashboard updates
-- FastAPI backend with CORS for local development
-- React/Vite frontend for visualization with markdown rendering support
-- Static pattern scanning for common vulnerabilities in Critic agent
-- Backup creation before any code modifications
+- **Decoupled Handoff**: BugRewind hands off monitoring duties to RewindWatcher via a shared SQLite database.
+- **Iterative Improvement**: Critic-Coder loop for deployments.
+- **Correlated Forensics**: Watcher correlates container logs back to source code lines for precise fixes.
+- **Graceful Failure**: Monitoring continues even if the LLM is temporarily unavailable.
 
 ## Entry Points
-1. **Interactive Launcher**: `start.py` - Menu-driven interface for choosing between:
-   - GUI Dashboard (Interactive Web UI)
-   - CLI Automation (Headless terminal scan)
-   - MCP Server (Protocol for AI Assistants)
-   - Exit
-
-2. **CLI**: `bugrewind.main` - Command-line interface for direct workflow execution
-   ```bash
-   uv run python -m bugrewind.main /path/to/repo --prompt "Deploy securely"
-   ```
-
-3. **MCP Server**: `bugrewind.mcp_server` - Exposes workflow as MCP tool for AI assistants
-   ```bash
-   uv run python -m bugrewind.mcp_server
-   ```
-
-4. **Dashboard API**: `bugrewind.dashboard_api` - FastAPI server with WebSocket support
-   ```bash
-   uv run uvicorn bugrewind.dashboard_api:app --reload
-   ```
-
-5. **GUI Launcher**: `bugrewind.gui` - Starts both backend (FastAPI) and frontend (Vite) concurrently
-   ```bash
-   uv run python -m bugrewind.gui
-   ```
-
-## Dashboard Architecture
-- **Backend**: FastAPI server running on port 8000
-  - `/health` - Health check endpoint
-  - `/ws` - WebSocket endpoint for real-time updates
-  - `/api/run` - POST endpoint to trigger workflow runs
-- **Frontend**: React/Vite dev server running on port 3000
-  - Uses lucide-react for icons
-  - Uses react-markdown and remark-gfm for markdown rendering
-  - Connects to backend via WebSocket for live updates
-
-## Critic Agent Static Pattern Scanning
-The Critic agent uses static regex patterns to catch common vulnerabilities that LLMs sometimes miss:
-- Hardcoded secrets/passwords/API keys
-- Hardcoded environment variables (DB_PASSWORD, SECRET_KEY, etc.)
-- Unsafe subprocess calls without shell sanitization
-- SQL injection patterns
-- Path traversal patterns
-- XSS vulnerabilities
-- Plaintext password storage
-
-## Installed Scripts
-After `uv sync`, the following scripts are available:
-- `bugrewind` - Runs the CLI entry point
-- `bugrewind-mcp` - Runs the MCP server
-
-## Output Files
-- `outputs/summary.md` - Generated markdown summary of the entire workflow execution
-- `.env` - Created by Coder agent when hardcoded secrets are found
-- `Dockerfile` - Generated if missing
-- `.dockerignore` - Generated if missing
-- Backup directory - Created by Orchestrator before any modifications
+1. **Interactive Launcher**: `start.py`
+2. **BugRewind CLI**: `uv run python -m bugrewind.main`
+3. **RewindWatcher**: `uv run python watcher/monitor.py`
+4. **MCP Server**: `bugrewind-mcp`

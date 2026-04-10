@@ -62,6 +62,8 @@ def solomon_node(state: BugRewindState) -> dict:
 
     If the Docker image was built successfully, Solomon starts the container
     and performs a basic health-check.  This is the final deployment step.
+    On successful deployment, the container is registered in the monitoring
+    database so RewindWatcher can track it.
     """
     logs = state.get("logs", "")
 
@@ -84,6 +86,35 @@ def solomon_node(state: BugRewindState) -> dict:
         status = "deployed"
         log_entry = "[Solomon] Container deployed successfully."
         logger.info("✅ " + log_entry)
+
+        # ── Register container for RewindWatcher monitoring ──────────
+        try:
+            import uuid
+            from bugrewind.utils.db import insert_container
+
+            record_id = str(uuid.uuid4())
+            container_id = "bugrewind-container"  # matches docker_run default
+            repo_path = state.get("repo_path", "")
+            target_email = state.get("target_email", "admin@local.dev")
+
+            insert_container(
+                record_id=record_id,
+                container_id=container_id,
+                repository_path=repo_path,
+                target_email=target_email,
+            )
+            log_entry += (
+                f"\n[Solomon] Registered container for RewindWatcher monitoring "
+                f"(id={record_id})."
+            )
+            logger.info(
+                "📡 Container registered for monitoring (record_id=%s)", record_id
+            )
+        except Exception as exc:
+            logger.warning("Could not register container for monitoring: %s", exc)
+            log_entry += (
+                f"\n[Solomon] Warning: failed to register for monitoring — {exc}"
+            )
     else:
         status = "run_failed"
         log_entry = f"[Solomon] Container failed to start.\n{run_log[:500]}"
