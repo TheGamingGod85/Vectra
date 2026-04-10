@@ -225,6 +225,17 @@ async def get_watcher_containers():
         logger.error(f"Error fetching containers: {e}")
         return {"containers": [], "metrics": {}}
 
+@app.delete("/api/watcher/containers/{container_id}")
+async def delete_watcher_container(container_id: str):
+    """Delete a monitored container entry."""
+    from bugrewind.utils.db import delete_container
+    try:
+        delete_container(container_id)
+        return {"status": "success", "message": f"Container {container_id} deleted."}
+    except Exception as e:
+        logger.error(f"Error deleting container: {e}")
+        return {"status": "error", "message": str(e)}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

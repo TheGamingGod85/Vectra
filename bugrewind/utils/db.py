@@ -164,3 +164,20 @@ def get_all_containers() -> list[dict]:
         return [dict(row) for row in cursor.fetchall()]
     finally:
         conn.close()
+
+def delete_container(record_id: str) -> None:
+    """Delete a container record from the monitoring database.
+
+    Args:
+        record_id: The UUID primary key.
+    """
+    conn = _get_connection()
+    try:
+        conn.execute(
+            "DELETE FROM containers WHERE id = ?",
+            (record_id,),
+        )
+        conn.commit()
+        logger.info("Deleted container %s", record_id)
+    finally:
+        conn.close()

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Server, AlertCircle, CheckCircle, RefreshCw, Archive, Info, Eye, X, Terminal, Lightbulb } from 'lucide-react';
+import { Activity, Server, AlertCircle, CheckCircle, RefreshCw, Archive, Info, Eye, X, Terminal, Lightbulb, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -26,6 +26,18 @@ export default function WatcherMetrics() {
     const interval = setInterval(fetchMetrics, 30000); // 30s auto-refresh
     return () => clearInterval(interval);
   }, []);
+
+  const deleteContainer = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this container?")) return;
+    try {
+      await fetch(`http://localhost:8000/api/watcher/containers/${id}`, {
+        method: 'DELETE',
+      });
+      fetchMetrics();
+    } catch (err) {
+      console.error("Failed to delete container", err);
+    }
+  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -100,7 +112,7 @@ export default function WatcherMetrics() {
                         {c.status}
                       </span>
                     </td>
-                    <td style={{ padding: '12px 8px', textAlign: 'center' }}>
+                    <td style={{ padding: '12px 8px', textAlign: 'center', display: 'flex', gap: '8px', justifyContent: 'center' }}>
                       <button 
                         onClick={() => setInspectContainer(c)}
                         style={{ background: 'transparent', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text)', padding: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', transition: 'all 0.2s' }}
@@ -109,6 +121,15 @@ export default function WatcherMetrics() {
                         onMouseOut={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.color = 'var(--color-text)'; }}
                       >
                         <Eye size={14} />
+                      </button>
+                      <button
+                        onClick={() => deleteContainer(c.id)}
+                        style={{ background: 'transparent', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text)', padding: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', transition: 'all 0.2s' }}
+                        title="Delete Container"
+                        onMouseOver={(e) => { e.currentTarget.style.borderColor = '#ef4444'; e.currentTarget.style.color = '#ef4444'; }}
+                        onMouseOut={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.color = 'var(--color-text)'; }}
+                      >
+                        <Trash2 size={14} />
                       </button>
                     </td>
                   </tr>
