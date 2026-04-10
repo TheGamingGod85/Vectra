@@ -240,12 +240,20 @@ async def delete_watcher_container(container_id: str):
 async def start_watcher_container(container_id: str):
     """Start a docker container by its docker container_id."""
     import docker
+    from bugrewind.utils.db import _get_connection
     try:
         client = docker.from_env()
         # Find exactly the container using container_id
         container = client.containers.get(container_id)
         container.start()
-        return {"status": "success", "message": f"Container {container_id} started."}
+        
+        # Reset status back to 'monitoring' so the watcher daemon picks it up again
+        conn = _get_connection()
+        conn.execute("UPDATE containers SET status = 'monitoring' WHERE container_id = ?", (container_id,))
+        conn.commit()
+        conn.close()
+        
+        return {"status": "success", "message": f"Container {container_id} started and monitoring resumed."}
     except Exception as e:
         logger.error(f"Error starting container {container_id}: {e}")
         return {"status": "error", "message": str(e)}
