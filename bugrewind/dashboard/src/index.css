@@ -283,3 +283,53 @@ header {
   color: #ef4444; /* red */
   margin-right: 6px;
 }
+
+/* Markdown Styling */
+.markdown-body {
+  color: var(--color-text);
+  word-wrap: break-word;
+}
+.markdown-body p, 
+.markdown-body ul, 
+.markdown-body ol {
+  margin-bottom: 12px;
+}
+.markdown-body h1, .markdown-body h2, .markdown-body h3 {
+  color: var(--color-accent);
+  margin-top: 16px;
+  margin-bottom: 10px;
+}
+.markdown-body pre {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.8rem;
+  margin-bottom: 12px;
+  border: 1px solid var(--color-border);
+}
+.markdown-body code {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  color: var(--color-accent);
+}
+.markdown-body pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  border-radius: 0;
+}
+.markdown-body ul, .markdown-body ol {
+  padding-left: 20px;
+}
+.markdown-body li {
+  margin-bottom: 4px;
+}
+.markdown-body hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 16px 0;
+}

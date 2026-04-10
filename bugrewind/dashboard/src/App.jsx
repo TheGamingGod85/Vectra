@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Coffee, Shield, Code, Container, FileText, CheckCircle, Activity, Terminal, Cpu, Info, X } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const AGENT_NODES = [
   { id: 'orchestrator', label: 'Orchestrator', icon: Coffee },
@@ -193,7 +195,9 @@ function App() {
             {state.plan && (
               <div style={{ padding: '16px', background: 'rgba(219, 193, 172, 0.05)', borderRadius: '12px', border: '1px solid rgba(219, 193, 172, 0.2)' }}>
                 <div style={{ color: '#dbc1ac', fontSize: '0.85rem', fontWeight: 800, marginBottom: '8px', letterSpacing: '0.05em' }}>ORCHESTRATOR PLAN</div>
-                <div style={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap', lineHeight: 1.5, opacity: 0.9 }}>{state.plan}</div>
+                <div className="markdown-body" style={{ fontSize: '0.85rem', lineHeight: 1.5, opacity: 0.9 }}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{state.plan}</ReactMarkdown>
+                </div>
               </div>
             )}
 
@@ -265,7 +269,9 @@ function App() {
             {state.summary && (
               <div style={{ padding: '20px', background: 'rgba(219, 193, 172, 0.05)', borderRadius: '12px', border: '1px solid rgba(219, 193, 172, 0.3)', animation: 'slide-in 0.5s ease' }}>
                 <div style={{ fontWeight: 800, marginBottom: '12px', color: '#dbc1ac', fontSize: '1.1rem' }}>FINAL REPORT</div>
-                <div style={{ fontSize: '0.9rem', lineHeight: '1.6' }}>{state.summary}</div>
+                <div className="markdown-body" style={{ fontSize: '0.9rem', lineHeight: '1.6' }}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{state.summary}</ReactMarkdown>
+                </div>
               </div>
             )}
             
