@@ -27,6 +27,24 @@ uv run python -m bugrewind.main /path/to/repo --prompt "Deploy securely" --max-i
 uv run python -m bugrewind.mcp_server
 ```
 
+### Launch Dashboard (GUI)
+```bash
+uv run python -m bugrewind.gui
+```
+This starts both the FastAPI backend (port 8000) and Vite frontend (port 3000).
+
+### Start Dashboard Backend Only
+```bash
+uv run uvicorn bugrewind.dashboard_api:app --reload
+```
+
+### Start Dashboard Frontend Only
+```bash
+cd bugrewind/dashboard
+npm install  # First time only
+npm run dev
+```
+
 ### Using Installed Scripts
 ```bash
 # After uv sync, scripts are available:
@@ -59,6 +77,14 @@ pip install uv
 
 # Or using the official installer
 # See https://github.com/astral-sh/uv
+```
+
+### Install Node.js (for Dashboard)
+```bash
+# Download from https://nodejs.org
+# Verify installation:
+node --version
+npm --version
 ```
 
 ## Windows Utility Commands
@@ -143,6 +169,15 @@ docker stop <container-id>
 docker logs <container-id>
 ```
 
+### Test Dashboard API
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Trigger workflow (requires JSON payload)
+curl -X POST http://localhost:8000/api/run -H "Content-Type: application/json" -d "{\"repo_path\":\"/path/to/repo\",\"deploy_prompt\":\"Deploy securely\"}"
+```
+
 ## Troubleshooting
 
 ### Check Ollama Status
@@ -176,4 +211,19 @@ docker images
 
 # List containers
 docker ps -a
+```
+
+### Dashboard Issues
+```bash
+# Check if backend is running
+curl http://localhost:8000/health
+
+# Check if frontend is running
+curl http://localhost:3000
+
+# Reinstall frontend dependencies
+cd bugrewind/dashboard
+del package-lock.json
+rmdir /s /q node_modules
+npm install
 ```
