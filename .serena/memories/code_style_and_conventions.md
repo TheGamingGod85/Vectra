@@ -25,3 +25,10 @@
 ## Database Access
 - All database operations must go through `bugrewind/utils/db.py`.
 - Ensure connection closing in `finally` blocks to avoid locking `monitored_containers.sqlite`.
+
+## Prompt Files
+- **System Prompts**: Located in `.prompts/` directory
+  - `PROMPT.md`: Main system prompt for the BugRewind AI agent
+  - `REWINDPROMPT.md`: Specification for RewindWatcher implementation
+- **Usage**: These prompts guide AI development and should be referenced when implementing new features
+- **Updates**: When modifying agent behavior, check if corresponding prompt updates are needed

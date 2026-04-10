@@ -12,7 +12,8 @@ BugRewind is an AI-powered secure deployment system using multi-agent orchestrat
 - **Docker**: Docker SDK (for monitoring) and Docker CLI (for deployments)
 - **Database**: SQLite (for monitoring state)
 - **Web Dashboard**: FastAPI + React/Vite
-- **Dependencies**: langgraph, langchain-core, langchain-ollama, fastmcp, httpx, pydantic, fastapi, uvicorn, websockets, python-multipart, docker
+- **Dependencies**: langgraph, langchain-core, langchain-ollama, fastmcp, httpx, pydantic, fastapi, uvicorn, websockets, python-multipart, docker, markdown
+- **Frontend Dependencies**: React, React DOM, lucide-react, react-markdown, remark-gfm, Vite
 
 ## Architecture
 LangGraph-based multi-agent orchestration comprising two main services:
@@ -57,6 +58,9 @@ watcher/                 # RewindWatcher service
 └── notifier.py          # SMTP email dispatcher
 
 dashboard/               # React/Vite frontend
+.prompts/                # System prompt files for AI agents
+├── PROMPT.md           # Main system prompt
+└── REWINDPROMPT.md     # RewindWatcher specification
 outputs/                 # Deployment summaries
 monitored_containers.sqlite # Database tracking active containers
 ```

@@ -17,6 +17,27 @@ uv run python start.py
 uv run python -m bugrewind.main /path/to/repo --prompt "Deploy securely"
 ```
 
+### GUI Dashboard
+```bash
+uv run python -m bugrewind.gui
+```
+
+### MCP Server
+```bash
+uv run python -m bugrewind.mcp_server
+```
+
+## Prompt Files
+
+### View System Prompts
+```bash
+# Main system prompt
+cat .prompts/PROMPT.md
+
+# RewindWatcher specification
+cat .prompts/REWINDPROMPT.md
+```
+
 ## RewindWatcher (Monitoring Service)
 
 ### Start Monitoring Daemon
