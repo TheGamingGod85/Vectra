@@ -80,17 +80,35 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/api/browse")
 async def browse_folder():
-    def _open_dialog():
-        import tkinter as tk
-        from tkinter import filedialog
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes("-topmost", True)
-        folder = filedialog.askdirectory(parent=root, title="Select Repository Folder")
-        root.destroy()
-        return folder
-    loop = asyncio.get_running_loop()
-    folder_path = await loop.run_in_executor(None, _open_dialog)
+    import subprocess
+    import sys
+    py_code = (
+        "import tkinter as tk; "
+        "from tkinter import filedialog; "
+        "root = tk.Tk(); "
+        "root.withdraw(); "
+        "root.attributes('-topmost', True); "
+        "print(filedialog.askdirectory(parent=root, title='Select Repository Folder')); "
+        "root.destroy()"
+    )
+    
+    creationflags = 0
+    if os.name == 'nt':
+        creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000)
+        
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable, "-c", py_code,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            creationflags=creationflags
+        )
+        stdout, _ = await proc.communicate()
+        folder_path = stdout.decode('utf-8').strip()
+    except Exception as e:
+        logger.error("Failed to open dialog: %s", e)
+        folder_path = ""
+        
     return {"path": folder_path}
 
 @app.post("/api/run")
