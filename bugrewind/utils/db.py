@@ -107,3 +107,19 @@ def update_container_status(record_id: str, new_status: str) -> None:
         logger.info("Updated container %s → status=%s", record_id, new_status)
     finally:
         conn.close()
+
+def get_all_containers() -> list[dict]:
+    """Return all container records.
+
+    Returns:
+        A list of dicts with keys matching the table columns.
+    """
+    conn = _get_connection()
+    try:
+        cursor = conn.execute(
+            "SELECT id, container_id, repository_path, target_email, status, deployed_at "
+            "FROM containers ORDER BY deployed_at DESC"
+        )
+        return [dict(row) for row in cursor.fetchall()]
+    finally:
+        conn.close()

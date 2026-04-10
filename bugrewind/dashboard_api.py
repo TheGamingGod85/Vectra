@@ -196,6 +196,35 @@ def serialize_state(state: Dict[str, Any]) -> Dict[str, Any]:
     # We'll just return it as is for now as pydantic handles it usually.
     return state
 
+@app.get("/api/watcher/containers")
+async def get_watcher_containers():
+    """Retrieve all monitored containers and watcher statistics."""
+    from bugrewind.utils.db import get_all_containers
+    try:
+        containers = get_all_containers()
+        
+        # Calculate some basic metrics
+        total = len(containers)
+        monitoring = sum(1 for c in containers if c['status'] == 'monitoring')
+        analyzing = sum(1 for c in containers if c['status'] == 'analyzing')
+        notified = sum(1 for c in containers if c['status'] == 'notified')
+        lost = sum(1 for c in containers if c['status'] == 'lost')
+        
+        metrics = {
+            "totalDeployments": total,
+            "activeMonitoring": monitoring,
+            "incidentsAnalyzed": notified + analyzing,
+            "containersLost": lost
+        }
+        
+        return {
+            "containers": containers,
+            "metrics": metrics
+        }
+    except Exception as e:
+        logger.error(f"Error fetching containers: {e}")
+        return {"containers": [], "metrics": {}}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

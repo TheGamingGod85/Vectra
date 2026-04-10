@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Coffee, Shield, Code, Container, FileText, CheckCircle, Activity, Terminal, Cpu, Info, X, FolderOpen, Cloud, Globe } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import WatcherMetrics from './WatcherMetrics';
 
 const DOCKER_NODES = [
   { id: 'orchestrator', label: 'Orchestrator', icon: Coffee },
@@ -23,6 +24,7 @@ const VERCEL_NODES = [
 ];
 
 function App() {
+  const [activeTab, setActiveTab] = useState('deploy');
   const [repoPath, setRepoPath] = useState('');
   const [prompt, setPrompt] = useState('Deploy this project securely via Docker.');
   const [deployTarget, setDeployTarget] = useState('docker');
@@ -221,6 +223,37 @@ function App() {
         </div>
       </header>
 
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: '12px', paddingBottom: '4px' }}>
+        <button 
+          onClick={() => setActiveTab('deploy')}
+          style={{ 
+            background: activeTab === 'deploy' ? 'var(--color-surface-soft)' : 'transparent', 
+            border: '1px solid var(--color-border)', 
+            borderColor: activeTab === 'deploy' ? 'var(--color-accent)' : 'var(--color-border)',
+            color: activeTab === 'deploy' ? '#dbc1ac' : 'var(--color-text-dim)', 
+            padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, transition: 'all 0.2s' 
+          }}
+        >
+          <Activity size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'text-bottom' }}/>
+          Deployment Flow
+        </button>
+        <button 
+          onClick={() => setActiveTab('monitor')}
+          style={{ 
+            background: activeTab === 'monitor' ? 'var(--color-surface-soft)' : 'transparent', 
+            border: '1px solid var(--color-border)', 
+            borderColor: activeTab === 'monitor' ? 'var(--color-accent)' : 'var(--color-border)',
+            color: activeTab === 'monitor' ? '#dbc1ac' : 'var(--color-text-dim)', 
+            padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, transition: 'all 0.2s'
+          }}
+        >
+          <Activity size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'text-bottom' }}/>
+          RewindWatcher Metrics
+        </button>
+      </div>
+
+      {activeTab === 'deploy' ? (
       <div className="dashboard-grid">
         {/* Agent Flow Graph */}
         <div className="panel graph-container">
@@ -413,6 +446,9 @@ function App() {
           </div>
         </div>
       </div>
+      ) : (
+        <WatcherMetrics />
+      )}
       
       {/* Connection Info Modal */}
       {showInfoModal && (
