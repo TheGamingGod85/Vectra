@@ -167,6 +167,8 @@ Include standard ignores (.git, __pycache__, node_modules, .env, venv, .venv,
 .bugrewind_backup, *.pyc, .mypy_cache, .pytest_cache, etc.)
 and anything else that should not be in a Docker image.
 
+CRITICAL: DO NOT add pyproject.toml, uv.lock, requirements.txt, or any dependency definition file to .dockerignore!
+
 Output ONLY the .dockerignore content, nothing else.
 """
 
@@ -369,7 +371,13 @@ def docker_gen_node(state: BugRewindState) -> dict:
         # Ensure critical entries are present
         must_have = {".env", ".venv", "venv", "__pycache__", ".git", ".bugrewind_backup"}
         existing_lines = set(dockerignore.splitlines())
-        missing = must_have - existing_lines
+        
+        # Strip out critically required files that should NOT be in .dockerignore
+        must_not_have = {"pyproject.toml", "uv.lock", "requirements.txt", "package.json", "yarn.lock", "pnpm-lock.yaml"}
+        filtered_lines = [line for line in dockerignore.splitlines() if line.strip() not in must_not_have]
+        dockerignore = "\n".join(filtered_lines)
+        
+        missing = must_have - set(filtered_lines)
         if missing:
             dockerignore += "\n" + "\n".join(sorted(missing))
 
