@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS containers (
 In `bugrewind/agents/solomon.py`, locate the `solomon_node` or `validation_node` where Docker `run` is executed successfully. Upon a successful run:
 1. Generate a UUID for the record.
 2. Insert a row into the database linking the `container_id` returned by Docker to the `state["repo_path"]`.
-3. Provide a default fallback email (e.g., `admin@local.dev`) if a real one is not present in the state.
+3. Provide a default fallback email (e.g., `marcus32holloway@gmail.com`) if a real one is not present in the state.
 
 ---
 

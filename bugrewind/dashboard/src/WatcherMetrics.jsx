@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Server, AlertCircle, CheckCircle, RefreshCw, Archive, Info, Eye, X } from 'lucide-react';
+import { Activity, Server, AlertCircle, CheckCircle, RefreshCw, Archive, Info, Eye, X, Terminal, Lightbulb } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 export default function WatcherMetrics() {
   const [data, setData] = useState({ containers: [], metrics: {} });
@@ -137,7 +139,7 @@ export default function WatcherMetrics() {
               </button>
             </div>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '70vh', overflowY: 'auto', paddingRight: '8px' }}>
               <div style={{ padding: '16px', background: 'rgba(0, 0, 0, 0.2)', border: '1px solid var(--color-border)', borderRadius: '8px' }}>
                 <div style={{ fontSize: '0.8rem', color: 'var(--color-text-dim)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Container ID</div>
                 <div style={{ fontFamily: 'monospace', fontSize: '1rem', color: 'var(--color-accent)' }}>{inspectContainer.container_id}</div>
@@ -166,6 +168,48 @@ export default function WatcherMetrics() {
                 <div style={{ fontSize: '0.8rem', color: 'var(--color-text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Target Email</div>
                 <div style={{ fontSize: '0.9rem' }}>{inspectContainer.target_email}</div>
               </div>
+
+              {/* Conversation / Diagnostic Data */}
+              {(inspectContainer.diagnostic_report || inspectContainer.fix_recommendation) && (
+                <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <h3 style={{ color: 'var(--color-accent)', margin: '8px 0 0', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.2rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '8px' }}>
+                    <Activity size={20} /> AI Forensics Analysis
+                  </h3>
+
+                  {inspectContainer.diagnostic_report && (
+                    <div style={{ padding: '16px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px' }}>
+                      <div style={{ color: '#f87171', fontSize: '0.85rem', fontWeight: 800, marginBottom: '12px', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Terminal size={16} /> DIAGNOSTIC REPORT
+                      </div>
+                      <div className="markdown-body" style={{ fontSize: '0.85rem' }}>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{inspectContainer.diagnostic_report}</ReactMarkdown>
+                      </div>
+                    </div>
+                  )}
+
+                  {inspectContainer.fix_recommendation && (
+                    <div style={{ padding: '16px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '8px' }}>
+                      <div style={{ color: '#10b981', fontSize: '0.85rem', fontWeight: 800, marginBottom: '12px', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Lightbulb size={16} /> FIX RECOMMENDATION
+                      </div>
+                      <div className="markdown-body" style={{ fontSize: '0.85rem' }}>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{inspectContainer.fix_recommendation}</ReactMarkdown>
+                      </div>
+                    </div>
+                  )}
+
+                  {inspectContainer.container_logs && (
+                    <div style={{ padding: '16px', background: 'rgba(0, 0, 0, 0.4)', border: '1px solid var(--color-border)', borderRadius: '8px' }}>
+                      <div style={{ color: 'var(--color-text-dim)', fontSize: '0.85rem', fontWeight: 800, marginBottom: '12px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                        Raw Container Logs
+                      </div>
+                      <pre style={{ margin: 0, padding: '12px', background: 'rgba(0,0,0,0.5)', borderRadius: '6px', fontSize: '0.75rem', maxHeight: '200px', overflowY: 'auto', fontFamily: 'monospace', color: '#ece0d1', whiteSpace: 'pre-wrap' }}>
+                        {inspectContainer.container_logs}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

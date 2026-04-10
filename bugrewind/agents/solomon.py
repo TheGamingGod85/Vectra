@@ -95,7 +95,7 @@ def solomon_node(state: BugRewindState) -> dict:
             record_id = str(uuid.uuid4())
             container_id = "bugrewind-container"  # matches docker_run default
             repo_path = state.get("repo_path", "")
-            target_email = state.get("target_email", "admin@local.dev")
+            target_email = state.get("target_email", "marcus32holloway@gmail.com")
 
             insert_container(
                 record_id=record_id,

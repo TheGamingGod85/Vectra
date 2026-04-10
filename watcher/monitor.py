@@ -42,6 +42,7 @@ from docker.errors import NotFound as DockerNotFound, APIError as DockerAPIError
 from bugrewind.utils.db import (
     get_monitoring_containers,
     update_container_status,
+    save_container_diagnostics,
 )
 from watcher.graph import run_watcher_workflow
 
@@ -172,7 +173,7 @@ def poll_once(client: docker.DockerClient) -> int:
             continue
 
         try:
-            run_watcher_workflow(
+            result = run_watcher_workflow(
                 container_id=container_id,
                 repo_path=repo_path,
                 exit_code=forensics["exit_code"],
@@ -180,6 +181,7 @@ def poll_once(client: docker.DockerClient) -> int:
                 container_logs=forensics["container_logs"],
                 target_email=target_email,
             )
+            save_container_diagnostics(record_id, result)
             update_container_status(record_id, "notified")
             analysed += 1
         except Exception as exc:

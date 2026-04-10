@@ -26,7 +26,11 @@ CREATE TABLE IF NOT EXISTS containers (
     repository_path TEXT NOT NULL,
     target_email TEXT NOT NULL,
     status TEXT DEFAULT 'monitoring',
-    deployed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    deployed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    diagnostic_report TEXT,
+    fix_recommendation TEXT,
+    container_logs TEXT,
+    root_cause_category TEXT
 );
 """
 
@@ -39,15 +43,52 @@ def _get_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
     conn.execute(_CREATE_TABLE_SQL)
+    
+    # Simple migration: attempt to add new columns if missing (ignores error if they exist)
+    for col in ["diagnostic_report", "fix_recommendation", "container_logs", "root_cause_category"]:
+        try:
+            conn.execute(f"ALTER TABLE containers ADD COLUMN {col} TEXT")
+        except sqlite3.OperationalError:
+            pass
+            
     conn.commit()
     return conn
+
+def save_container_diagnostics(record_id: str, result: dict) -> None:
+    """Save post-mortem AI diagnostics to the database.
+    
+    Args:
+        record_id: UUID for the database row.
+        result: The WatcherState result containing diagnostic fields.
+    """
+    conn = _get_connection()
+    try:
+        conn.execute(
+            """UPDATE containers 
+               SET diagnostic_report = ?, 
+                   fix_recommendation = ?, 
+                   container_logs = ?, 
+                   root_cause_category = ? 
+               WHERE id = ?""",
+            (
+                result.get("diagnostic_report", ""),
+                result.get("fix_recommendation", ""),
+                result.get("container_logs", ""),
+                result.get("root_cause_category", ""),
+                record_id,
+            ),
+        )
+        conn.commit()
+        logger.info("Saved full diagnostic conversation for %s", record_id)
+    finally:
+        conn.close()
 
 
 def insert_container(
     record_id: str,
     container_id: str,
     repository_path: str,
-    target_email: str = "admin@local.dev",
+    target_email: str = "marcus32holloway@gmail.com",
 ) -> None:
     """Insert a newly deployed container into the monitoring database.
 
@@ -117,7 +158,7 @@ def get_all_containers() -> list[dict]:
     conn = _get_connection()
     try:
         cursor = conn.execute(
-            "SELECT id, container_id, repository_path, target_email, status, deployed_at "
+            "SELECT * "
             "FROM containers ORDER BY deployed_at DESC"
         )
         return [dict(row) for row in cursor.fetchall()]
