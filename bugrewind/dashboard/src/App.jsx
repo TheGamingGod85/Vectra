@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Coffee, Shield, Code, Container, FileText, CheckCircle, Activity, Terminal, Cpu, Info, X } from 'lucide-react';
+import { Coffee, Shield, Code, Container, FileText, CheckCircle, Activity, Terminal, Cpu, Info, X, FolderOpen } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -71,6 +71,18 @@ function App() {
     setLogs(prev => [...prev, { time, message: msg }]);
   };
 
+  const handleBrowse = async () => {
+    try {
+      const res = await fetch('http://localhost:8000/api/browse');
+      const data = await res.json();
+      if (data.path) {
+        setRepoPath(data.path);
+      }
+    } catch (err) {
+      addLog('Failed to connect to backend for folder browsing.');
+    }
+  };
+
   const startWorkflow = async () => {
     setIsRunning(true);
     setLogs([]);
@@ -115,12 +127,34 @@ function App() {
           >
             <Info size={24} />
           </button>
-          <input
-            className="input-field"
-            placeholder="Repository Path (Absolute)"
-            value={repoPath}
-            onChange={(e) => setRepoPath(e.target.value)}
-          />
+          <div style={{ display: 'flex', flex: 1, position: 'relative' }}>
+            <input
+              className="input-field"
+              placeholder="Repository Path (Absolute)"
+              value={repoPath}
+              onChange={(e) => setRepoPath(e.target.value)}
+              style={{ width: '100%', paddingRight: '40px' }}
+            />
+            <button
+              onClick={handleBrowse}
+              style={{
+                position: 'absolute',
+                right: '8px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--color-text-dim)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              title="Browse Folder"
+            >
+              <FolderOpen size={20} />
+            </button>
+          </div>
           <button
             className="btn-primary"
             onClick={startWorkflow}

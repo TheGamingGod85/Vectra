@@ -78,6 +78,21 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
+@app.get("/api/browse")
+async def browse_folder():
+    def _open_dialog():
+        import tkinter as tk
+        from tkinter import filedialog
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        folder = filedialog.askdirectory(parent=root, title="Select Repository Folder")
+        root.destroy()
+        return folder
+    loop = asyncio.get_running_loop()
+    folder_path = await loop.run_in_executor(None, _open_dialog)
+    return {"path": folder_path}
+
 @app.post("/api/run")
 async def trigger_run(req: runRequest):
     """Start an async workflow run and stream events to WebSocket."""
