@@ -224,6 +224,53 @@ header {
   transform: none;
 }
 
+/* Deploy Target Radio Group */
+.deploy-target-group {
+  display: flex;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 3px;
+  flex-shrink: 0;
+}
+
+.deploy-target-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--color-text-dim);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  white-space: nowrap;
+}
+
+.deploy-target-option input[type="radio"] {
+  display: none;
+}
+
+.deploy-target-option:hover:not(.active) {
+  color: var(--color-text);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.deploy-target-option.active {
+  background: linear-gradient(135deg, rgba(219, 193, 172, 0.15), rgba(150, 114, 89, 0.2));
+  color: var(--color-accent);
+  border: 1px solid rgba(219, 193, 172, 0.3);
+  box-shadow: 0 0 12px rgba(219, 193, 172, 0.15), inset 0 0 8px rgba(219, 193, 172, 0.05);
+}
+
+.deploy-target-option.active svg {
+  filter: drop-shadow(0 0 4px rgba(219, 193, 172, 0.4));
+}
+
 .log-entry {
   font-family: 'JetBrains Mono', Consolas, monospace;
   font-size: 0.85rem;

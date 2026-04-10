@@ -44,6 +44,12 @@ def main() -> None:
         action="store_true",
         help="Enable DEBUG-level logging.",
     )
+    parser.add_argument(
+        "--target",
+        choices=["docker", "vercel"],
+        default=None,
+        help="Deployment target (docker or vercel). Auto-detected from prompt if omitted.",
+    )
 
     args = parser.parse_args()
 
@@ -62,6 +68,7 @@ def main() -> None:
     print(f"\n🚀 BugRewind starting for: {repo}")
     print(f"   Prompt:         {args.prompt}")
     print(f"   Max iterations: {args.max_iter}")
+    print(f"   Deploy target:  {args.target or 'auto-detect'}")
     print()
 
     # ── Run the workflow ───────────────────────────────────────────────
@@ -69,6 +76,7 @@ def main() -> None:
         repo_path=str(repo),
         deploy_prompt=args.prompt,
         max_iterations=args.max_iter,
+        deploy_target=args.target,
     )
 
     # ── Print the summary ──────────────────────────────────────────────
@@ -80,16 +88,32 @@ def main() -> None:
     else:
         print("⚠️  No summary was generated.")
 
-    docker_status = final_state.get("docker_status", "unknown")
-    if docker_status == "deployed":
-        print("\n✅ Deployment successful!  Container is running.")
-        sys.exit(0)
-    elif docker_status in ("build_failed", "run_failed"):
-        print(f"\n❌ Deployment failed (status: {docker_status}).")
-        sys.exit(1)
+    # ── Print final result ─────────────────────────────────────────────
+    deploy_target = final_state.get("deploy_target", "docker")
+
+    if deploy_target == "vercel":
+        vercel_status = final_state.get("vercel_status", "unknown")
+        url = final_state.get("vercel_deploy_url", "")
+        if vercel_status == "deployed":
+            print(f"\n✅ Vercel deployment successful!  Live at: {url}")
+            sys.exit(0)
+        elif vercel_status in ("deploy_failed", "setup_failed"):
+            print(f"\n❌ Vercel deployment failed (status: {vercel_status}).")
+            sys.exit(1)
+        else:
+            print(f"\nℹ️  Final Vercel status: {vercel_status}")
+            sys.exit(0)
     else:
-        print(f"\nℹ️  Final docker status: {docker_status}")
-        sys.exit(0)
+        docker_status = final_state.get("docker_status", "unknown")
+        if docker_status == "deployed":
+            print("\n✅ Deployment successful!  Container is running.")
+            sys.exit(0)
+        elif docker_status in ("build_failed", "run_failed"):
+            print(f"\n❌ Deployment failed (status: {docker_status}).")
+            sys.exit(1)
+        else:
+            print(f"\nℹ️  Final docker status: {docker_status}")
+            sys.exit(0)
 
 
 if __name__ == "__main__":

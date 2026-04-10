@@ -18,6 +18,8 @@ class BugRewindState(TypedDict):
     Attributes:
         repo_path:          Absolute path to the target repository on disk.
         deploy_prompt:      Free-form user intent / deployment instructions.
+        deploy_target:      Deployment backend — ``"docker"`` (default) or ``"vercel"``.
+                            Determined automatically from the deploy_prompt.
         codebase:           Concatenated source code text ingested from the repo.
         file_manifest:      Mapping of relative file path → file content for
                             targeted patching by the Coder agent.
@@ -41,12 +43,17 @@ class BugRewindState(TypedDict):
         docker_build_log:   Stdout/stderr from `docker build`.
         docker_run_log:     Stdout/stderr from `docker run`.
         docker_status:      High-level status string, e.g. "success", "build_failed".
+        vercel_json:        Generated vercel.json content.
+        vercel_deploy_url:  The URL returned by ``vercel deploy``.
+        vercel_deploy_log:  Stdout/stderr from the Vercel CLI.
+        vercel_status:      High-level status string, e.g. "deployed", "deploy_failed".
         logs:               Human-readable running log of all agent activity.
         summary:            Final markdown summary written to outputs/summary.md.
     """
 
     repo_path: str
     deploy_prompt: str
+    deploy_target: str
     codebase: str
     file_manifest: dict[str, str]
     plan: str
@@ -62,5 +69,9 @@ class BugRewindState(TypedDict):
     docker_build_log: str
     docker_run_log: str
     docker_status: str
+    vercel_json: str
+    vercel_deploy_url: str
+    vercel_deploy_log: str
+    vercel_status: str
     logs: str
     summary: str

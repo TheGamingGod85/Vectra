@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Coffee, Shield, Code, Container, FileText, CheckCircle, Activity, Terminal, Cpu, Info, X, FolderOpen } from 'lucide-react';
+import { Coffee, Shield, Code, Container, FileText, CheckCircle, Activity, Terminal, Cpu, Info, X, FolderOpen, Cloud, Globe } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-const AGENT_NODES = [
+const DOCKER_NODES = [
   { id: 'orchestrator', label: 'Orchestrator', icon: Coffee },
   { id: 'critic', label: 'Critic', icon: Shield },
   { id: 'coder', label: 'Coder', icon: Code },
@@ -13,9 +13,19 @@ const AGENT_NODES = [
   { id: 'summary', label: 'Summary', icon: FileText },
 ];
 
+const VERCEL_NODES = [
+  { id: 'orchestrator', label: 'Orchestrator', icon: Coffee },
+  { id: 'critic', label: 'Critic', icon: Shield },
+  { id: 'coder', label: 'Coder', icon: Code },
+  { id: 'vercel_setup', label: 'Vercel Setup', icon: Cloud },
+  { id: 'vercel_deploy', label: 'Vercel Deploy', icon: Globe },
+  { id: 'summary', label: 'Summary', icon: FileText },
+];
+
 function App() {
   const [repoPath, setRepoPath] = useState('');
   const [prompt, setPrompt] = useState('Deploy this project securely via Docker.');
+  const [deployTarget, setDeployTarget] = useState('docker');
   const [activeNode, setActiveNode] = useState(null);
   const [logs, setLogs] = useState([]);
   const [state, setState] = useState({
@@ -29,10 +39,16 @@ function App() {
     max_iterations: 3,
     docker_build_log: '',
     docker_run_log: '',
-    docker_status: ''
+    docker_status: '',
+    vercel_json: '',
+    vercel_deploy_url: '',
+    vercel_deploy_log: '',
+    vercel_status: '',
   });
   const [isRunning, setIsRunning] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
+
+  const AGENT_NODES = deployTarget === 'vercel' ? VERCEL_NODES : DOCKER_NODES;
 
   const logEndRef = useRef(null);
   const ws = useRef(null);
@@ -86,18 +102,23 @@ function App() {
   const startWorkflow = async () => {
     setIsRunning(true);
     setLogs([]);
-    setLogs([{ time: new Date().toLocaleTimeString(), message: '🚀 Invoking BugRewind workflow...' }]);
+    setLogs([{ time: new Date().toLocaleTimeString(), message: `🚀 Invoking BugRewind workflow (target: ${deployTarget})...` }]);
     setState({
       issues: [], patches: [], dockerfile: '', summary: '',
       plan: '', file_manifest: {}, iteration: 0, max_iterations: 3,
-      docker_build_log: '', docker_run_log: '', docker_status: ''
+      docker_build_log: '', docker_run_log: '', docker_status: '',
+      vercel_json: '', vercel_deploy_url: '', vercel_deploy_log: '', vercel_status: '',
     });
 
     try {
       const res = await fetch('http://localhost:8000/api/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repo_path: repoPath, deploy_prompt: prompt }),
+        body: JSON.stringify({
+          repo_path: repoPath,
+          deploy_prompt: prompt,
+          deploy_target: deployTarget,
+        }),
       });
       const data = await res.json();
       addLog(data.message);
@@ -117,7 +138,7 @@ function App() {
           <Coffee size={36} color="#dbc1ac" style={{ filter: 'drop-shadow(0 0 15px rgba(219, 193, 172, 0.4))' }} />
           <h1 style={{ fontWeight: 800, fontSize: '1.75rem', letterSpacing: '-0.02em', margin: 0, background: 'linear-gradient(135deg, #ece0d1, #967259)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>BugRewind</h1>
         </div>
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flex: 1, maxWidth: '600px', marginLeft: '40px' }}>
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flex: 1, maxWidth: '750px', marginLeft: '40px' }}>
           <button 
             style={{ background: 'transparent', border: 'none', color: '#dbc1ac', cursor: 'pointer', padding: '8px', borderRadius: '50%', display: 'flex', transition: 'transform 0.2s' }}
             onClick={() => setShowInfoModal(true)}
@@ -127,6 +148,41 @@ function App() {
           >
             <Info size={24} />
           </button>
+
+          {/* Deploy Target Radio Group */}
+          <div className="deploy-target-group">
+            <label
+              className={`deploy-target-option ${deployTarget === 'docker' ? 'active' : ''}`}
+              title="Deploy via Docker container"
+            >
+              <input
+                type="radio"
+                name="deployTarget"
+                value="docker"
+                checked={deployTarget === 'docker'}
+                onChange={(e) => setDeployTarget(e.target.value)}
+                disabled={isRunning}
+              />
+              <Container size={16} />
+              <span>Docker</span>
+            </label>
+            <label
+              className={`deploy-target-option ${deployTarget === 'vercel' ? 'active' : ''}`}
+              title="Deploy to Vercel (Serverless)"
+            >
+              <input
+                type="radio"
+                name="deployTarget"
+                value="vercel"
+                checked={deployTarget === 'vercel'}
+                onChange={(e) => setDeployTarget(e.target.value)}
+                disabled={isRunning}
+              />
+              <Globe size={16} />
+              <span>Vercel</span>
+            </label>
+          </div>
+
           <div style={{ display: 'flex', flex: 1, position: 'relative' }}>
             <input
               className="input-field"
@@ -263,16 +319,54 @@ function App() {
               </div>
             )}
 
-            {/* Dockerfile Preview */}
-            {state.dockerfile && (
+            {/* Dockerfile Preview (Docker target) */}
+            {deployTarget === 'docker' && state.dockerfile && (
               <div style={{ padding: '16px', background: 'rgba(0, 0, 0, 0.2)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
                 <div style={{ color: '#dbc1ac', fontSize: '0.85rem', fontWeight: 800, marginBottom: '12px', letterSpacing: '0.05em' }}>DOCKERFILE PREVIEW</div>
                 <pre style={{ fontSize: '0.8rem', whiteSpace: 'pre-wrap', fontFamily: "'JetBrains Mono', monospace", color: '#ece0d1' }}>{state.dockerfile}</pre>
               </div>
             )}
 
-            {/* 5. Docker Logs */}
-            {(state.docker_build_log || state.docker_run_log) && (
+            {/* vercel.json Preview (Vercel target) */}
+            {deployTarget === 'vercel' && state.vercel_json && (
+              <div style={{ padding: '16px', background: 'rgba(0, 0, 0, 0.2)', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.15)' }}>
+                <div style={{ color: '#60a5fa', fontSize: '0.85rem', fontWeight: 800, marginBottom: '12px', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Globe size={16} /> VERCEL.JSON PREVIEW
+                </div>
+                <pre style={{ fontSize: '0.8rem', whiteSpace: 'pre-wrap', fontFamily: "'JetBrains Mono', monospace", color: '#ece0d1' }}>{state.vercel_json}</pre>
+              </div>
+            )}
+
+            {/* Vercel Deploy Output (Vercel target) */}
+            {deployTarget === 'vercel' && (state.vercel_deploy_url || state.vercel_deploy_log) && (
+              <div style={{ padding: '16px', background: 'rgba(0, 0, 0, 0.2)', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                <div style={{ color: 'var(--color-text-dim)', fontSize: '0.85rem', fontWeight: 800, marginBottom: '12px', letterSpacing: '0.05em', display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Cloud size={16} /> VERCEL OUTPUT</span>
+                  {state.vercel_status && <span style={{ color: state.vercel_status.includes('fail') || state.vercel_status.includes('skip') ? '#f87171' : '#10b981' }}>{state.vercel_status}</span>}
+                </div>
+
+                {state.vercel_deploy_url && (
+                  <div style={{ marginBottom: '12px', padding: '10px 14px', background: 'rgba(16, 185, 129, 0.08)', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 700, marginRight: '8px' }}>LIVE URL:</span>
+                    <a href={state.vercel_deploy_url} target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa', fontSize: '0.85rem', fontFamily: 'monospace', textDecoration: 'underline' }}>
+                      {state.vercel_deploy_url}
+                    </a>
+                  </div>
+                )}
+
+                {state.vercel_deploy_log && (
+                  <details>
+                    <summary style={{ cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-accent)' }}>Deploy Log</summary>
+                    <pre style={{ marginTop: '8px', padding: '12px', background: 'rgba(0,0,0,0.4)', borderRadius: '6px', fontSize: '0.7rem', maxHeight: '150px', overflowY: 'auto', fontFamily: 'monospace', color: '#ece0d1', whiteSpace: 'pre-wrap' }}>
+                      {state.vercel_deploy_log}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            )}
+
+            {/* 5. Docker Logs (Docker target) */}
+            {deployTarget === 'docker' && (state.docker_build_log || state.docker_run_log) && (
               <div style={{ padding: '16px', background: 'rgba(0, 0, 0, 0.2)', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
                 <div style={{ color: 'var(--color-text-dim)', fontSize: '0.85rem', fontWeight: 800, marginBottom: '12px', letterSpacing: '0.05em', display: 'flex', justifyContent: 'space-between' }}>
                   <span>DOCKER OUTPUT</span>

@@ -20,13 +20,22 @@ LangGraph-based multi-agent workflow with the following agents:
 1. **Orchestrator Agent**: Entry point that understands repo + user intent, creates execution plan, creates backup of original codebase
 2. **Critic Agent**: Security + quality reviewer that detects vulnerabilities (secrets, unsafe shell usage, dependency risks, missing Dockerfile, OWASP-style flaws). Uses both static regex patterns and LLM analysis.
 3. **Coder Agent**: Applies fixes based on critic findings (does NOT rewrite entire repo), generates Dockerfile and .dockerignore when missing
-4. **Solomon Agent**: Execution agent that runs shell commands and executes Docker (build, run, validation)
+4. **Solomon Agent**: Execution agent that runs shell commands, executes Docker (build, run, validation), and deploys to Vercel via the Vercel CLI
 
-## Workflow Graph
+## Deployment Targets
+The workflow supports two deployment pipelines, selected automatically from the user's prompt or explicitly via `--target`:
+
+### Docker path (default)
 ```
 START → Orchestrator → Critic → Coder → Critic (loop)
       → Docker Gen → Validation → [pass?] → Solomon → Summary → END
                                  ↘ [fail?] → Critic (re-analyse, max 2 retries)
+```
+
+### Vercel path (when user mentions vercel/serverless/cloud)
+```
+START → Orchestrator → Critic → Coder → Critic (loop)
+      → Vercel Setup → Vercel Deploy → Summary → END
 ```
 
 The Critic-Coder loop continues until:
@@ -40,11 +49,12 @@ After Docker build fails, the error logs are fed back to the Critic for up to 2 
 Uses `BugRewindState` TypedDict with fields:
 - `repo_path`: Absolute path to the target repository on disk
 - `deploy_prompt`: Free-form user intent / deployment instructions
+- `deploy_target`: Deployment backend — `"docker"` (default) or `"vercel"`. Auto-detected from prompt.
 - `codebase`: Concatenated source code text ingested from the repo
 - `file_manifest`: Mapping of relative file path → file content for targeted patching
 - `plan`: Structured execution plan produced by the Orchestrator
 - `issues`: Accumulated list of vulnerability / quality findings (uses operator.add reducer)
-- `current_issues`: The LATEST batch of issues from the most recent Critic run (what Coder actually fixes)
+- `current_issues`: The LATEST batch of issues from the most recent Critic run
 - `patches`: Accumulated list of code patches produced by the Coder (uses operator.add reducer)
 - `last_patch_count`: Number of patches successfully applied in the most recent Coder run
 - `iteration`: Current critic↔coder loop iteration (0-indexed)
@@ -55,6 +65,10 @@ Uses `BugRewindState` TypedDict with fields:
 - `docker_build_log`: Stdout/stderr from `docker build`
 - `docker_run_log`: Stdout/stderr from `docker run`
 - `docker_status`: High-level status string, e.g. "success", "build_failed"
+- `vercel_json`: Generated vercel.json content
+- `vercel_deploy_url`: The URL returned by `vercel deploy`
+- `vercel_deploy_log`: Stdout/stderr from the Vercel CLI
+- `vercel_status`: High-level status string, e.g. "deployed", "deploy_failed"
 - `logs`: Human-readable running log of all agent activity
 - `summary`: Final markdown summary written to outputs/summary.md
 

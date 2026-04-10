@@ -5,10 +5,14 @@ The execution agent.  Solomon is the ONLY agent allowed to:
 
 * Run shell commands
 * Execute Docker builds and container starts
+* Deploy to Vercel via the Vercel CLI
 
 It orchestrates the validation step: build → run → check.  If the build or
 run fails, it feeds the error logs back into state so the Critic can
 re-analyse and the Coder can re-patch.
+
+For Vercel deployments, Solomon generates the required configuration
+(vercel.json, requirements.txt) and drives the ``vercel deploy`` CLI.
 """
 
 from __future__ import annotations
@@ -17,6 +21,12 @@ import logging
 
 from bugrewind.graph.state import BugRewindState
 from bugrewind.tools.docker_tools import docker_build, docker_run
+from bugrewind.tools.vercel_tools import (
+    vercel_generate_config,
+    vercel_generate_requirements,
+    vercel_deploy,
+    vercel_inspect,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +96,147 @@ def solomon_node(state: BugRewindState) -> dict:
     }
 
 
+# ── Vercel deployment nodes ─────────────────────────────────────────────────
+
+
+def vercel_setup_node(state: BugRewindState) -> dict:
+    """LangGraph node: Vercel Setup.
+
+    Generates ``vercel.json`` and ``requirements.txt`` for a FastAPI project
+    so it can be deployed as a Vercel Serverless Function.
+
+    The entry point is auto-detected from the file manifest: looks for
+    ``api/main.py``, ``main.py``, ``app/main.py``, or ``api/index.py``
+    in that order.
+    """
+    repo_path = state["repo_path"]
+    file_manifest = state.get("file_manifest", {})
+    logs = state.get("logs", "")
+
+    logger.info("📦 Vercel Setup: generating configuration …")
+
+    # ── Auto-detect the FastAPI entry point ──────────────────────────────
+    candidates = ["api/main.py", "main.py", "app/main.py", "api/index.py"]
+    entry_point = "api/main.py"  # default
+    for candidate in candidates:
+        if candidate in file_manifest:
+            entry_point = candidate
+            break
+
+    # ── Generate vercel.json ───────────────────────────────────────────
+    ok_config, config_log = vercel_generate_config(
+        project_path=repo_path,
+        entry_point=entry_point,
+    )
+    logs += f"\n[VercelSetup] {config_log}"
+
+    # ── Detect extra dependencies from the codebase ────────────────────
+    extra_deps: list[str] = []
+    codebase = state.get("codebase", "")
+    # Simple heuristic: scan imports for common packages
+    import_map = {
+        "sqlalchemy": "sqlalchemy",
+        "pydantic": "pydantic",
+        "httpx": "httpx",
+        "jinja2": "jinja2",
+        "python-multipart": "python-multipart",
+        "aiofiles": "aiofiles",
+        "databases": "databases",
+        "passlib": "passlib",
+        "python-jose": "python-jose",
+        "bcrypt": "bcrypt",
+        "starlette": "starlette",
+    }
+    for import_name, pip_name in import_map.items():
+        if import_name in codebase:
+            extra_deps.append(pip_name)
+
+    ok_reqs, reqs_log = vercel_generate_requirements(
+        project_path=repo_path,
+        extra_deps=extra_deps,
+    )
+    logs += f"\n[VercelSetup] {reqs_log}"
+
+    # Read back the generated vercel.json for state
+    import json
+    from pathlib import Path
+    vercel_json_path = Path(repo_path) / "vercel.json"
+    vercel_json_content = ""
+    if vercel_json_path.exists():
+        vercel_json_content = vercel_json_path.read_text(encoding="utf-8")
+
+    status = "setup_success" if (ok_config and ok_reqs) else "setup_failed"
+    log_entry = f"[VercelSetup] Configuration generated → {status}"
+    logger.info(log_entry)
+
+    return {
+        "vercel_json": vercel_json_content,
+        "vercel_status": status,
+        "logs": logs + "\n" + log_entry,
+    }
+
+
+def vercel_deploy_node(state: BugRewindState) -> dict:
+    """LangGraph node: Vercel Deployment.
+
+    Deploys the project to Vercel using the CLI.  If setup failed earlier,
+    deployment is skipped gracefully.
+    """
+    repo_path = state["repo_path"]
+    logs = state.get("logs", "")
+    vercel_status = state.get("vercel_status", "")
+
+    if vercel_status != "setup_success":
+        log_entry = (
+            "[VercelDeploy] Skipping deployment — setup did not succeed "
+            f"(status={vercel_status})."
+        )
+        logger.warning(log_entry)
+        return {
+            "vercel_status": "deploy_skipped",
+            "logs": logs + "\n" + log_entry,
+        }
+
+    # ── Deploy (production) ───────────────────────────────────────────
+    logger.info("🚀 Vercel Deploy: deploying to production …")
+    success, deploy_log = vercel_deploy(
+        project_path=repo_path,
+        prod=True,
+    )
+
+    # Extract the deployment URL from the log
+    deploy_url = ""
+    if success:
+        # vercel deploy prints the URL as the first non-empty line
+        for line in deploy_log.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("https://"):
+                deploy_url = stripped
+                break
+
+        status = "deployed"
+        log_entry = f"[VercelDeploy] Deployed successfully → {deploy_url}"
+        logger.info("✅ " + log_entry)
+
+        # Optionally inspect the deployment
+        _, inspect_log = vercel_inspect(
+            deployment_url=deploy_url,
+            project_path=repo_path,
+        )
+        deploy_log += "\n\n--- Deployment Inspection ---\n" + inspect_log
+    else:
+        status = "deploy_failed"
+        log_entry = f"[VercelDeploy] Deployment failed.\n{deploy_log[:500]}"
+        logger.error(log_entry)
+
+    return {
+        "vercel_deploy_url": deploy_url,
+        "vercel_deploy_log": deploy_log,
+        "vercel_status": status,
+        "logs": logs + "\n" + log_entry,
+    }
+
+
 def summary_node(state: BugRewindState) -> dict:
     """LangGraph node: Summary.
 
@@ -99,6 +250,8 @@ def summary_node(state: BugRewindState) -> dict:
     patches = state.get("patches", [])
     iteration = state.get("iteration", 0)
     docker_status = state.get("docker_status", "unknown")
+    deploy_target = state.get("deploy_target", "docker")
+    vercel_status = state.get("vercel_status", "unknown")
     logs = state.get("logs", "")
     repo_path = state.get("repo_path", "N/A")
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -109,8 +262,9 @@ def summary_node(state: BugRewindState) -> dict:
         "",
         f"**Generated:** `{timestamp}`",
         f"**Repository:** `{repo_path}`",
+        f"**Deploy Target:** `{deploy_target}`",
         f"**Iterations:** {iteration}",
-        f"**Docker Status:** `{docker_status}`",
+        f"**Docker Status:** `{docker_status}`" if deploy_target == "docker" else f"**Vercel Status:** `{vercel_status}`",
         f"**Total Issues Found:** {len(issues)}",
         f"**Total Patches Applied:** {len(patches)}",
         "",
@@ -160,22 +314,38 @@ def summary_node(state: BugRewindState) -> dict:
     else:
         lines.append("_No patches applied._")
 
+    # ── Deployment logs section (conditional on deploy target) ───────────
+    if deploy_target == "vercel":
+        vercel_deploy_url = state.get("vercel_deploy_url", "N/A")
+        lines += [
+            "## Vercel Deployment",
+            "",
+            f"**Deployment URL:** `{vercel_deploy_url}`",
+            "",
+            "### Vercel Deploy Log (last 50 lines)",
+            "",
+            "```",
+            "\n".join((state.get("vercel_deploy_log", "") or "N/A").splitlines()[-50:]),
+            "```",
+            "",
+        ]
+    else:
+        lines += [
+            "## Docker Build Log (last 50 lines)",
+            "",
+            "```",
+            "\n".join((state.get("docker_build_log", "") or "N/A").splitlines()[-50:]),
+            "```",
+            "",
+            "## Docker Run Log (last 30 lines)",
+            "",
+            "```",
+            "\n".join((state.get("docker_run_log", "") or "N/A").splitlines()[-30:]),
+            "```",
+            "",
+        ]
+
     lines += [
-        "",
-        "---",
-        "",
-        "## Docker Build Log (last 50 lines)",
-        "",
-        "```",
-        "\n".join((state.get("docker_build_log", "") or "N/A").splitlines()[-50:]),
-        "```",
-        "",
-        "## Docker Run Log (last 30 lines)",
-        "",
-        "```",
-        "\n".join((state.get("docker_run_log", "") or "N/A").splitlines()[-30:]),
-        "```",
-        "",
         "---",
         "",
         "## Agent Activity Log",
@@ -190,16 +360,30 @@ def summary_node(state: BugRewindState) -> dict:
         "",
     ]
 
-    if docker_status == "deployed":
-        lines.append("✅ **Deployment succeeded.**  Container is running.")
-    elif docker_status == "build_success":
-        lines.append("⚠️ **Build succeeded** but container was not started.")
-    elif docker_status == "build_failed":
-        lines.append("❌ **Docker build failed.**  See logs above.")
-    elif docker_status == "run_failed":
-        lines.append("❌ **Container failed to start.**  See logs above.")
+    # ── Final result (conditional on deploy target) ─────────────────────
+    if deploy_target == "vercel":
+        if vercel_status == "deployed":
+            url = state.get("vercel_deploy_url", "")
+            lines.append(f"✅ **Vercel deployment succeeded.**  Live at: `{url}`")
+        elif vercel_status == "setup_failed":
+            lines.append("❌ **Vercel setup failed.**  See logs above.")
+        elif vercel_status == "deploy_failed":
+            lines.append("❌ **Vercel deployment failed.**  See logs above.")
+        elif vercel_status == "deploy_skipped":
+            lines.append("⚠️ **Vercel deployment was skipped.**")
+        else:
+            lines.append(f"ℹ️ Vercel status: `{vercel_status}`")
     else:
-        lines.append(f"ℹ️ Docker status: `{docker_status}`")
+        if docker_status == "deployed":
+            lines.append("✅ **Deployment succeeded.**  Container is running.")
+        elif docker_status == "build_success":
+            lines.append("⚠️ **Build succeeded** but container was not started.")
+        elif docker_status == "build_failed":
+            lines.append("❌ **Docker build failed.**  See logs above.")
+        elif docker_status == "run_failed":
+            lines.append("❌ **Container failed to start.**  See logs above.")
+        else:
+            lines.append(f"ℹ️ Docker status: `{docker_status}`")
 
     lines.append("")
     lines.append("---")

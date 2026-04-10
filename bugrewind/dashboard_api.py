@@ -14,7 +14,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from bugrewind.graph.workflow import build_workflow
+from bugrewind.graph.workflow import build_workflow, _detect_deploy_target
 from bugrewind.graph.state import BugRewindState
 
 # ── Setup ──────────────────────────────────────────────────────────────────
@@ -38,6 +38,7 @@ class runRequest(BaseModel):
     repo_path: str
     deploy_prompt: str = "Deploy this project securely via Docker."
     max_iterations: int = 3
+    deploy_target: str | None = None
 
 # ── State ──────────────────────────────────────────────────────────────────
 
@@ -133,10 +134,13 @@ async def trigger_run(req: runRequest):
 async def execute_workflow(req: runRequest):
     """Internal runner that streams LangGraph state updates."""
     workflow = build_workflow()
-    
+
+    resolved_target = req.deploy_target or _detect_deploy_target(req.deploy_prompt)
+
     initial_state: BugRewindState = {
         "repo_path": req.repo_path,
         "deploy_prompt": req.deploy_prompt,
+        "deploy_target": resolved_target,
         "codebase": "",
         "file_manifest": {},
         "plan": "",
@@ -152,6 +156,10 @@ async def execute_workflow(req: runRequest):
         "docker_build_log": "",
         "docker_run_log": "",
         "docker_status": "",
+        "vercel_json": "",
+        "vercel_deploy_url": "",
+        "vercel_deploy_log": "",
+        "vercel_status": "",
         "logs": "[BugRewind] Dashboard-triggered workflow started.",
         "summary": "",
     }
