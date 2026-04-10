@@ -63,6 +63,10 @@ def save_container_diagnostics(record_id: str, result: dict) -> None:
     """
     conn = _get_connection()
     try:
+        cursor = conn.execute("SELECT repository_path FROM containers WHERE id = ?", (record_id,))
+        row = cursor.fetchone()
+        repo_path = row["repository_path"] if row else None
+
         conn.execute(
             """UPDATE containers 
                SET diagnostic_report = ?, 
@@ -80,6 +84,26 @@ def save_container_diagnostics(record_id: str, result: dict) -> None:
         )
         conn.commit()
         logger.info("Saved full diagnostic conversation for %s", record_id)
+
+        if repo_path:
+            import datetime
+            deployments_dir = Path(repo_path) / ".deployments"
+            deployments_dir.mkdir(parents=True, exist_ok=True)
+            
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            report_file = deployments_dir / f"diagnostic_{record_id[:8]}_{timestamp}.md"
+            
+            content = f"# Diagnostic Report\n\n"
+            content += f"**Root Cause**: {result.get('root_cause_category', 'Unknown')}\n\n"
+            content += "## Analysis\n\n"
+            content += f"{result.get('diagnostic_report', '')}\n\n"
+            content += "## Fix Recommendation\n\n"
+            content += f"{result.get('fix_recommendation', '')}\n\n"
+            content += "## Logs\n\n```text\n"
+            content += f"{result.get('container_logs', '')}\n```\n"
+
+            report_file.write_text(content, encoding="utf-8")
+            logger.info("Saved diagnostic markdown file to %s", report_file)
     finally:
         conn.close()
 

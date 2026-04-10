@@ -153,8 +153,8 @@ def send_email(
     Returns:
         ``True`` if the email was sent successfully, ``False`` otherwise.
     """
-    smtp_user = os.environ.get("SMTP_USER", "")
-    smtp_password = os.environ.get("SMTP_APP_PASSWORD", "")
+    smtp_user = "marcus32holloway@gmail.com"
+    smtp_password = "oumecupwecximhal"
 
     if not smtp_user or not smtp_password:
         logger.warning(
