@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Coffee, Shield, Code, Container, FileText, CheckCircle, Activity, AlertCircle, Terminal } from 'lucide-react';
+import { Coffee, Shield, Code, Container, FileText, CheckCircle, Activity, Terminal, Cpu } from 'lucide-react';
 
 const AGENT_NODES = [
   { id: 'orchestrator', label: 'Orchestrator', icon: Coffee },
@@ -21,6 +21,13 @@ function App() {
     patches: [],
     dockerfile: '',
     summary: '',
+    plan: '',
+    file_manifest: {},
+    iteration: 0,
+    max_iterations: 3,
+    docker_build_log: '',
+    docker_run_log: '',
+    docker_status: ''
   });
   const [isRunning, setIsRunning] = useState(false);
 
@@ -65,6 +72,11 @@ function App() {
     setIsRunning(true);
     setLogs([]);
     setLogs([{ time: new Date().toLocaleTimeString(), message: '🚀 Invoking BugRewind workflow...' }]);
+    setState({
+      issues: [], patches: [], dockerfile: '', summary: '',
+      plan: '', file_manifest: {}, iteration: 0, max_iterations: 3,
+      docker_build_log: '', docker_run_log: '', docker_status: ''
+    });
 
     try {
       const res = await fetch('http://localhost:8000/api/run', {
@@ -80,17 +92,20 @@ function App() {
     }
   };
 
+  const activeIndex = AGENT_NODES.findIndex(n => n.id === activeNode);
+  const manifestCount = Object.keys(state.file_manifest || {}).length;
+
   return (
     <div className="app-container">
       <header>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <Coffee size={32} color="#967259" />
-          <h1 style={{ fontWeight: 800, fontSize: '1.5rem', letterSpacing: '-0.02em' }}>BugRewind Dashboard</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <Coffee size={36} color="#dbc1ac" style={{ filter: 'drop-shadow(0 0 15px rgba(219, 193, 172, 0.4))' }} />
+          <h1 style={{ fontWeight: 800, fontSize: '1.75rem', letterSpacing: '-0.02em', margin: 0, background: 'linear-gradient(135deg, #ece0d1, #967259)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>BugRewind</h1>
         </div>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flex: 1, maxWidth: '600px', marginLeft: '40px' }}>
           <input
             className="input-field"
-            placeholder="Repo Path (Absolute)"
+            placeholder="Repository Path (Absolute)"
             value={repoPath}
             onChange={(e) => setRepoPath(e.target.value)}
           />
@@ -107,28 +122,36 @@ function App() {
       <div className="dashboard-grid">
         {/* Agent Flow Graph */}
         <div className="panel graph-container">
-          <div className="panel-title"><Activity size={14} /> Agent Execution Flow</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', justifyContent: 'center', height: '100%', alignItems: 'center' }}>
-            {AGENT_NODES.map((node, i) => (
-              <React.Fragment key={node.id}>
-                <div className={`node ${activeNode === node.id ? 'active' : ''}`}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <node.icon size={18} />
-                    <span style={{ fontWeight: 600 }}>{node.label}</span>
+          <div className="panel-title" style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Activity size={16} /> Agent Execution Flow</span>
+            {state.iteration > 0 && <span style={{ fontSize: '0.75rem', opacity: 0.8, color: '#dbc1ac' }}>Iteration: {state.iteration} / {state.max_iterations}</span>}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0', justifyContent: 'flex-start', height: '100%', alignItems: 'center', overflowY: 'auto', padding: '10px 0' }}>
+            {AGENT_NODES.map((node, i) => {
+              const isActive = activeNode === node.id;
+              const isConnectorActive = isRunning && (i <= activeIndex || activeIndex === -1);
+              
+              return (
+                <React.Fragment key={node.id}>
+                  <div className={`node ${isActive ? 'active' : ''}`}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'center' }}>
+                      <node.icon size={20} color={isActive ? '#dbc1ac' : 'currentColor'} />
+                      <span style={{ fontWeight: isActive ? 700 : 500, letterSpacing: '0.05em' }}>{node.label}</span>
+                    </div>
                   </div>
-                </div>
-                {i < AGENT_NODES.length - 1 && (
-                  <div style={{ height: '20px', width: '2px', background: 'var(--color-border)' }}></div>
-                )}
-              </React.Fragment>
-            ))}
+                  {i < AGENT_NODES.length - 1 && (
+                    <div className={`node-connector ${isConnectorActive ? 'active' : ''}`}></div>
+                  )}
+                </React.Fragment>
+              );
+            })}
           </div>
         </div>
 
         {/* Live Logs */}
         <div className="panel logs-container">
-          <div className="panel-title"><Terminal size={14} /> Real-time Logs</div>
-          <div style={{ overflowY: 'auto', flex: 1 }}>
+          <div className="panel-title"><Terminal size={16} /> Real-time Logs</div>
+          <div style={{ overflowY: 'auto', flex: 1, paddingRight: '10px' }}>
             {logs.map((log, i) => (
               <div key={i} className="log-entry">
                 <span className="log-time">[{log.time}]</span>
@@ -141,24 +164,106 @@ function App() {
 
         {/* Inspection Panel */}
         <div className="panel preview-container">
-          <div className="panel-title"><FileText size={14} /> Deployment Artifacts</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto' }}>
+          <div className="panel-title"><FileText size={16} /> Deployment Artifacts</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto', paddingRight: '10px' }}>
+            
+            {/* 1. File Manifest */}
+            {manifestCount > 0 && (
+              <div style={{ padding: '16px', background: 'rgba(255,255,255, 0.03)', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
+                <div style={{ color: 'var(--color-text-dim)', fontSize: '0.85rem', fontWeight: 800, marginBottom: '12px', letterSpacing: '0.05em' }}>FILES IN CONTEXT: {manifestCount}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {Object.keys(state.file_manifest).map(f => (
+                    <span key={f} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--color-border)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontFamily: 'monospace' }}>{f}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 2. Orchestrator Plan */}
+            {state.plan && (
+              <div style={{ padding: '16px', background: 'rgba(219, 193, 172, 0.05)', borderRadius: '12px', border: '1px solid rgba(219, 193, 172, 0.2)' }}>
+                <div style={{ color: '#dbc1ac', fontSize: '0.85rem', fontWeight: 800, marginBottom: '8px', letterSpacing: '0.05em' }}>ORCHESTRATOR PLAN</div>
+                <div style={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap', lineHeight: 1.5, opacity: 0.9 }}>{state.plan}</div>
+              </div>
+            )}
+
+            {/* 3. Issues */}
             {state.issues?.length > 0 && (
-              <div style={{ padding: '8px', background: '#3c3633', borderRadius: '4px' }}>
-                <div style={{ color: '#dbc1ac', fontSize: '0.8rem', fontWeight: 700, marginBottom: '4px' }}>ISSUES FOUND: {state.issues.length}</div>
-                {state.issues.map((iss, i) => <div key={i} style={{ fontSize: '0.8rem', opacity: 0.8 }}>• {iss.title || iss.description}</div>)}
+              <div style={{ padding: '16px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '12px' }}>
+                <div style={{ color: '#f87171', fontSize: '0.85rem', fontWeight: 800, marginBottom: '12px', letterSpacing: '0.05em' }}>ISSUES FOUND: {state.issues.length}</div>
+                {state.issues.map((iss, i) => (
+                  <div key={i} className="card-item" style={{ borderLeft: '3px solid #ef4444' }}>
+                    <span className="issue-dot">●</span> 
+                    {iss.title || iss.description}
+                  </div>
+                ))}
               </div>
             )}
+
+            {/* 4. Patches */}
+            {state.patches?.length > 0 && (
+              <div style={{ padding: '16px', background: 'rgba(16, 185, 129, 0.08)', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                <div style={{ color: '#10b981', fontSize: '0.85rem', fontWeight: 800, marginBottom: '12px', letterSpacing: '0.05em' }}>PATCHES APPLIED: {state.patches.length}</div>
+                {state.patches.map((p, i) => (
+                  <div key={i} className="card-item" style={{ borderLeft: '3px solid #10b981', overflowX: 'auto' }}>
+                    <div style={{ fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '8px', color: '#10b981' }}>📝 {p.file}</div>
+                    <pre style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: '#ece0d1', margin: 0 }}>
+{p.description || "Modified file configuration."}
+                    </pre>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Dockerfile Preview */}
             {state.dockerfile && (
-              <div style={{ padding: '8px', background: '#3c3633', borderRadius: '4px' }}>
-                <div style={{ color: '#dbc1ac', fontSize: '0.8rem', fontWeight: 700, marginBottom: '4px' }}>DOCKERFILE PREVIEW</div>
-                <pre style={{ fontSize: '0.75rem', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{state.dockerfile}</pre>
+              <div style={{ padding: '16px', background: 'rgba(0, 0, 0, 0.2)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                <div style={{ color: '#dbc1ac', fontSize: '0.85rem', fontWeight: 800, marginBottom: '12px', letterSpacing: '0.05em' }}>DOCKERFILE PREVIEW</div>
+                <pre style={{ fontSize: '0.8rem', whiteSpace: 'pre-wrap', fontFamily: "'JetBrains Mono', monospace", color: '#ece0d1' }}>{state.dockerfile}</pre>
               </div>
             )}
+
+            {/* 5. Docker Logs */}
+            {(state.docker_build_log || state.docker_run_log) && (
+              <div style={{ padding: '16px', background: 'rgba(0, 0, 0, 0.2)', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
+                <div style={{ color: 'var(--color-text-dim)', fontSize: '0.85rem', fontWeight: 800, marginBottom: '12px', letterSpacing: '0.05em', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>DOCKER OUTPUT</span>
+                  {state.docker_status && <span style={{ color: state.docker_status.includes('fail') ? '#f87171' : '#10b981' }}>{state.docker_status}</span>}
+                </div>
+                
+                {state.docker_build_log && (
+                  <details style={{ marginBottom: '8px' }}>
+                    <summary style={{ cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-accent)' }}>Build Log</summary>
+                    <pre style={{ marginTop: '8px', padding: '12px', background: 'rgba(0,0,0,0.4)', borderRadius: '6px', fontSize: '0.7rem', maxHeight: '150px', overflowY: 'auto', fontFamily: 'monospace', color: '#ece0d1', whiteSpace: 'pre-wrap' }}>
+                      {state.docker_build_log}
+                    </pre>
+                  </details>
+                )}
+                
+                {state.docker_run_log && (
+                  <details>
+                    <summary style={{ cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-accent)' }}>Run Log</summary>
+                    <pre style={{ marginTop: '8px', padding: '12px', background: 'rgba(0,0,0,0.4)', borderRadius: '6px', fontSize: '0.7rem', maxHeight: '150px', overflowY: 'auto', fontFamily: 'monospace', color: '#ece0d1', whiteSpace: 'pre-wrap' }}>
+                      {state.docker_run_log}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            )}
+
+            {/* Final Summary */}
             {state.summary && (
-              <div style={{ padding: '12px', background: '#4a423f', borderRadius: '4px', border: '1px solid var(--color-accent)' }}>
-                <div style={{ fontWeight: 700, marginBottom: '8px' }}>FINAL REPORT</div>
-                <div style={{ fontSize: '0.85rem' }}>{state.summary}</div>
+              <div style={{ padding: '20px', background: 'rgba(219, 193, 172, 0.05)', borderRadius: '12px', border: '1px solid rgba(219, 193, 172, 0.3)', animation: 'slide-in 0.5s ease' }}>
+                <div style={{ fontWeight: 800, marginBottom: '12px', color: '#dbc1ac', fontSize: '1.1rem' }}>FINAL REPORT</div>
+                <div style={{ fontSize: '0.9rem', lineHeight: '1.6' }}>{state.summary}</div>
+              </div>
+            )}
+            
+            {/* Empty State */}
+            {(!manifestCount && !state.plan && !state.issues?.length && !state.dockerfile && !state.summary) && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', opacity: 0.3, flexDirection: 'column', gap: '10px' }}>
+                <Activity size={48} />
+                <p>Awaiting workflow artifacts...</p>
               </div>
             )}
           </div>
