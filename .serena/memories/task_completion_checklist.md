@@ -26,6 +26,12 @@
 - [ ] New dependencies are added to `pyproject.toml`
 - [ ] Code comments explain complex logic
 
+### Dashboard (if applicable)
+- [ ] New API endpoints are documented
+- [ ] WebSocket updates include all relevant state changes
+- [ ] Frontend components handle loading/error states
+- [ ] CORS is properly configured for local development
+
 ## After Completing a Task
 
 ### Verification Steps
@@ -46,6 +52,13 @@
 4. **Check output files**:
    - Verify `outputs/summary.md` is generated
    - Review summary content for accuracy
+
+5. **Test Dashboard** (if applicable):
+   - Start GUI: `uv run python -m bugrewind.gui`
+   - Verify backend is running on http://localhost:8000
+   - Verify frontend is running on http://localhost:3000
+   - Test WebSocket connection
+   - Trigger workflow via API and verify real-time updates
 
 ### Common Issues to Check
 
@@ -70,6 +83,13 @@
 - Reducers work correctly for accumulated fields
 - State updates return correct keys
 
+#### Dashboard-Related
+- FastAPI server starts without errors
+- WebSocket connections are accepted
+- CORS allows frontend connections
+- Background tasks complete successfully
+- Frontend receives WebSocket messages
+
 ## When to Ask for Help
 
 If you encounter:
@@ -77,6 +97,8 @@ If you encounter:
 - Docker build/run failures that can't be diagnosed
 - State management issues that break the workflow
 - Unclear requirements or ambiguous specifications
+- WebSocket connection issues
+- Frontend build or runtime errors
 
 ## Code Review Checklist
 
@@ -101,3 +123,19 @@ If you encounter:
 - [ ] Reducers used for accumulated fields
 - [ ] Default values are sensible
 - [ ] Field is documented in docstring
+
+### For Dashboard API Changes
+- [ ] New endpoints have appropriate HTTP methods
+- [ ] Request/response models use Pydantic
+- [ ] Async functions used for I/O operations
+- [ ] WebSocket broadcasts include all necessary data
+- [ ] Error handling returns appropriate status codes
+- [ ] CORS is configured correctly
+
+### For Frontend Changes
+- [ ] Components follow React best practices
+- [ ] State management is appropriate (useState, useEffect, etc.)
+- [ ] Error boundaries are in place where needed
+- [ ] Loading states are handled
+- [ ] WebSocket connections are cleaned up on unmount
+- [ ] Icons use lucide-react library

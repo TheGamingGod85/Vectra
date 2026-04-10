@@ -10,7 +10,8 @@ BugRewind is an AI-powered secure deployment system using multi-agent orchestrat
 - **Agent Framework**: LangGraph
 - **MCP Server**: FastMCP
 - **Docker**: Docker CLI (subprocess)
-- **Dependencies**: langgraph, langchain-core, langchain-ollama, fastmcp, httpx, pydantic
+- **Web Dashboard**: FastAPI + React/Vite
+- **Dependencies**: langgraph, langchain-core, langchain-ollama, fastmcp, httpx, pydantic, fastapi, uvicorn, websockets, python-multipart
 
 ## Architecture
 LangGraph-based multi-agent workflow with the following agents:
@@ -42,6 +43,8 @@ Issues and patches use `operator.add` reducer for accumulation.
 bugrewind/
 ├── main.py              # CLI entry point
 ├── mcp_server.py        # MCP server entry point
+├── dashboard_api.py     # FastAPI backend for dashboard
+├── gui.py               # GUI launcher (starts backend + frontend)
 ├── graph/
 │   ├── state.py         # BugRewindState TypedDict
 │   └── workflow.py      # LangGraph workflow definition
@@ -55,6 +58,13 @@ bugrewind/
 ├── utils/
 │   ├── llm.py           # Ollama API wrapper
 │   └── file_ops.py      # File operations
+├── dashboard/           # React/Vite frontend
+│   ├── package.json
+│   ├── vite.config.js
+│   └── src/
+│       ├── App.jsx
+│       ├── main.jsx
+│       └── index.css
 └── outputs/
     └── summary.md       # Generated summary
 ```
@@ -65,3 +75,21 @@ bugrewind/
 - Clear separation of responsibilities
 - Iterative improvement loop between Critic and Coder
 - Docker validation before final deployment
+- WebSocket-based real-time dashboard updates
+- FastAPI backend with CORS for local development
+- React/Vite frontend for visualization
+
+## Entry Points
+1. **CLI**: `bugrewind.main` - Command-line interface for direct workflow execution
+2. **MCP Server**: `bugrewind.mcp_server` - Exposes workflow as MCP tool for AI assistants
+3. **Dashboard API**: `bugrewind.dashboard_api` - FastAPI server with WebSocket support
+4. **GUI Launcher**: `bugrewind.gui` - Starts both backend (FastAPI) and frontend (Vite) concurrently
+
+## Dashboard Architecture
+- **Backend**: FastAPI server running on port 8000
+  - `/health` - Health check endpoint
+  - `/ws` - WebSocket endpoint for real-time updates
+  - `/api/run` - POST endpoint to trigger workflow runs
+- **Frontend**: React/Vite dev server running on port 3000
+  - Uses lucide-react for icons
+  - Connects to backend via WebSocket for live updates
