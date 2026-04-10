@@ -364,7 +364,7 @@ def critic_node(state: BugRewindState) -> dict:
 
     llm_issues: list[dict] = []
     try:
-        raw = call_ollama(prompt)
+        raw = call_ollama(prompt, max_tokens=8192, json_mode=True)
 
         # Log the raw response length for debugging
         logger.debug("Critic LLM raw response length: %d chars", len(raw))
