@@ -82,23 +82,32 @@ async def websocket_endpoint(websocket: WebSocket):
 async def browse_folder():
     import subprocess
     import sys
-    py_code = (
-        "import tkinter as tk; "
-        "from tkinter import filedialog; "
-        "root = tk.Tk(); "
-        "root.withdraw(); "
-        "root.attributes('-topmost', True); "
-        "print(filedialog.askdirectory(parent=root, title='Select Repository Folder')); "
-        "root.destroy()"
-    )
     
-    creationflags = 0
+    # Securely use PowerShell on Windows to invoke the native Folder Browser Dialog
     if os.name == 'nt':
+        ps_script = (
+            "Add-Type -AssemblyName System.windows.forms; "
+            "$f = New-Object System.Windows.Forms.FolderBrowserDialog; "
+            "$f.Description = 'Select Repository Folder'; "
+            "$f.ShowNewFolderButton = $true; "
+            "if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $f.SelectedPath }"
+        )
+        cmd = ["powershell", "-NoProfile", "-Command", ps_script]
         creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000)
-        
+    else:
+        # Fallback to tkinter for linux/mac if used
+        py_code = (
+            "import tkinter as tk; from tkinter import filedialog; "
+            "root = tk.Tk(); root.withdraw(); root.attributes('-topmost', True); "
+            "print(filedialog.askdirectory(parent=root, title='Select Repository Folder')); "
+            "root.destroy()"
+        )
+        cmd = [sys.executable, "-c", py_code]
+        creationflags = 0
+
     try:
         proc = await asyncio.create_subprocess_exec(
-            sys.executable, "-c", py_code,
+            *cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             creationflags=creationflags
