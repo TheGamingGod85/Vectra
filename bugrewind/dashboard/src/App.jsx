@@ -23,20 +23,20 @@ function App() {
     summary: '',
   });
   const [isRunning, setIsRunning] = useState(false);
-  
+
   const logEndRef = useRef(null);
   const ws = useRef(null);
 
   useEffect(() => {
     // Setup WebSocket
     ws.current = new WebSocket('ws://localhost:8000/ws');
-    
+
     ws.current.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.type === 'node_update') {
         setActiveNode(data.node);
         setState(prev => ({ ...prev, ...data.updates }));
-        
+
         // Add pseudo-log if logs are mixed in or just node transition
         addLog(`Transitioned to [${data.node}]`);
       } else if (data.type === 'workflow_complete') {
@@ -65,7 +65,7 @@ function App() {
     setIsRunning(true);
     setLogs([]);
     setLogs([{ time: new Date().toLocaleTimeString(), message: '🚀 Invoking BugRewind workflow...' }]);
-    
+
     try {
       const res = await fetch('http://localhost:8000/api/run', {
         method: 'POST',
@@ -88,14 +88,14 @@ function App() {
           <h1 style={{ fontWeight: 800, fontSize: '1.5rem', letterSpacing: '-0.02em' }}>BugRewind Dashboard</h1>
         </div>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <input 
-            className="input-field" 
-            placeholder="Repo Path (Absolute)" 
+          <input
+            className="input-field"
+            placeholder="Repo Path (Absolute)"
             value={repoPath}
             onChange={(e) => setRepoPath(e.target.value)}
           />
-          <button 
-            className="btn-primary" 
+          <button
+            className="btn-primary"
             onClick={startWorkflow}
             disabled={isRunning || !repoPath}
           >
@@ -107,7 +107,7 @@ function App() {
       <div className="dashboard-grid">
         {/* Agent Flow Graph */}
         <div className="panel graph-container">
-          <div className="panel-title"><Activity size={14}/> Agent Execution Flow</div>
+          <div className="panel-title"><Activity size={14} /> Agent Execution Flow</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', justifyContent: 'center', height: '100%', alignItems: 'center' }}>
             {AGENT_NODES.map((node, i) => (
               <React.Fragment key={node.id}>
@@ -127,7 +127,7 @@ function App() {
 
         {/* Live Logs */}
         <div className="panel logs-container">
-          <div className="panel-title"><Terminal size={14}/> Real-time Logs</div>
+          <div className="panel-title"><Terminal size={14} /> Real-time Logs</div>
           <div style={{ overflowY: 'auto', flex: 1 }}>
             {logs.map((log, i) => (
               <div key={i} className="log-entry">
@@ -141,26 +141,26 @@ function App() {
 
         {/* Inspection Panel */}
         <div className="panel preview-container">
-          <div className="panel-title"><FileText size={14}/> Deployment Artifacts</div>
+          <div className="panel-title"><FileText size={14} /> Deployment Artifacts</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto' }}>
-             {state.issues?.length > 0 && (
-               <div style={{ padding: '8px', background: '#3c3633', borderRadius: '4px' }}>
-                 <div style={{ color: '#dbc1ac', fontSize: '0.8rem', fontWeight: 700, marginBottom: '4px' }}>ISSUES FOUND: {state.issues.length}</div>
-                 {state.issues.map((iss, i) => <div key={i} style={{ fontSize: '0.8rem', opacity: 0.8 }}>• {iss.title || iss.description}</div>)}
-               </div>
-             )}
-             {state.dockerfile && (
-               <div style={{ padding: '8px', background: '#3c3633', borderRadius: '4px' }}>
-                 <div style={{ color: '#dbc1ac', fontSize: '0.8rem', fontWeight: 700, marginBottom: '4px' }}>DOCKERFILE PREVIEW</div>
-                 <pre style={{ fontSize: '0.75rem', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{state.dockerfile}</pre>
-               </div>
-             )}
-             {state.summary && (
-                <div style={{ padding: '12px', background: '#4a423f', borderRadius: '4px', border: '1px solid var(--color-accent)' }}>
-                   <div style={{ fontWeight: 700, marginBottom: '8px' }}>FINAL REPORT</div>
-                   <div style={{ fontSize: '0.85rem' }}>{state.summary}</div>
-                </div>
-             )}
+            {state.issues?.length > 0 && (
+              <div style={{ padding: '8px', background: '#3c3633', borderRadius: '4px' }}>
+                <div style={{ color: '#dbc1ac', fontSize: '0.8rem', fontWeight: 700, marginBottom: '4px' }}>ISSUES FOUND: {state.issues.length}</div>
+                {state.issues.map((iss, i) => <div key={i} style={{ fontSize: '0.8rem', opacity: 0.8 }}>• {iss.title || iss.description}</div>)}
+              </div>
+            )}
+            {state.dockerfile && (
+              <div style={{ padding: '8px', background: '#3c3633', borderRadius: '4px' }}>
+                <div style={{ color: '#dbc1ac', fontSize: '0.8rem', fontWeight: 700, marginBottom: '4px' }}>DOCKERFILE PREVIEW</div>
+                <pre style={{ fontSize: '0.75rem', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{state.dockerfile}</pre>
+              </div>
+            )}
+            {state.summary && (
+              <div style={{ padding: '12px', background: '#4a423f', borderRadius: '4px', border: '1px solid var(--color-accent)' }}>
+                <div style={{ fontWeight: 700, marginBottom: '8px' }}>FINAL REPORT</div>
+                <div style={{ fontSize: '0.85rem' }}>{state.summary}</div>
+              </div>
+            )}
           </div>
         </div>
       </div>
