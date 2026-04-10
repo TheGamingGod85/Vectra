@@ -76,6 +76,11 @@ that fix each issue.
    - For Python with `pyproject.toml`: add the new package to the dependencies
    - For Node.js: add to package.json dependencies
 
+9. **For unoptimized code:** Fix unnecessary loops, redundant queries, or blocking
+   operations in async code. Replace O(n^2) logic with dictionary lookups or
+   built-in functions where appropriate. The refactored code must maintain the
+   EXACT same functionality, inputs, and return types.
+
 ## Output Format
 
 For EACH FILE that needs modification, output exactly ONE JSON object with:
