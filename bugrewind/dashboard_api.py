@@ -236,6 +236,20 @@ async def delete_watcher_container(container_id: str):
         logger.error(f"Error deleting container: {e}")
         return {"status": "error", "message": str(e)}
 
+@app.post("/api/watcher/containers/{container_id}/start")
+async def start_watcher_container(container_id: str):
+    """Start a docker container by its docker container_id."""
+    import docker
+    try:
+        client = docker.from_env()
+        # Find exactly the container using container_id
+        container = client.containers.get(container_id)
+        container.start()
+        return {"status": "success", "message": f"Container {container_id} started."}
+    except Exception as e:
+        logger.error(f"Error starting container {container_id}: {e}")
+        return {"status": "error", "message": str(e)}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

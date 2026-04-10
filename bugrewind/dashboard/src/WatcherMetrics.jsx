@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Server, AlertCircle, CheckCircle, RefreshCw, Archive, Info, Eye, X, Terminal, Lightbulb, Trash2 } from 'lucide-react';
+import { Activity, Server, AlertCircle, CheckCircle, RefreshCw, Archive, Info, Eye, X, Terminal, Lightbulb, Trash2, Play } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -36,6 +36,17 @@ export default function WatcherMetrics() {
       fetchMetrics();
     } catch (err) {
       console.error("Failed to delete container", err);
+    }
+  };
+
+  const startContainer = async (container_id) => {
+    try {
+      await fetch(`http://localhost:8000/api/watcher/containers/${container_id}/start`, {
+        method: 'POST',
+      });
+      fetchMetrics();
+    } catch (err) {
+      console.error("Failed to start container", err);
     }
   };
 
@@ -123,6 +134,15 @@ export default function WatcherMetrics() {
                         <Eye size={14} />
                       </button>
                       <button
+                        onClick={() => startContainer(c.container_id)}
+                        style={{ background: 'transparent', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text)', padding: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', transition: 'all 0.2s' }}
+                        title="Start Container"
+                        onMouseOver={(e) => { e.currentTarget.style.borderColor = '#10b981'; e.currentTarget.style.color = '#10b981'; }}
+                        onMouseOut={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.color = 'var(--color-text)'; }}
+                      >
+                        <Play size={14} />
+                      </button>
+                      <button
                         onClick={() => deleteContainer(c.id)}
                         style={{ background: 'transparent', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text)', padding: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', transition: 'all 0.2s' }}
                         title="Delete Container"
@@ -147,7 +167,7 @@ export default function WatcherMetrics() {
           background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
         }}>
-          <div className="panel" style={{ width: '600px', maxWidth: '90%', padding: '32px' }}>
+          <div className="panel" style={{ width: '800px', maxWidth: '95%', padding: '32px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
               <h2 style={{ margin: 0, color: '#dbc1ac', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.5rem', fontWeight: 800 }}>
                 <Eye size={28} /> Inspect Container
