@@ -22,11 +22,16 @@ logger = logging.getLogger(__name__)
 ORCHESTRATOR_PROMPT = """\
 You are BugRewind's Orchestrator Agent — a senior DevSecOps architect.
 
-You have been given the full source code of a repository and a deployment request
-from the user.  Your job is to:
+You have been given the full source code of a repository, a deployment request
+from the user, and a deployment target.  Your job is to:
 
 1. Summarise the project: language/framework, purpose, entry points.
-2. Identify what deployment artefacts are needed (Dockerfile, .dockerignore, etc.).
+2. Identify what deployment artefacts are needed based on the DEPLOY TARGET:
+   - If the target is **docker**: plan for Dockerfile, .dockerignore, and container deployment.
+   - If the target is **vercel**: plan for vercel.json, requirements.txt, and Vercel
+     Serverless Function deployment.  The FastAPI app must be accessible via an
+     ``api/`` directory entry point (e.g. ``api/main.py``).  Note any restructuring
+     needed to make the project compatible with Vercel's Python runtime.
 3. List the areas of concern the Critic agent should focus on (secrets, unsafe
    shell usage, dependency risks, missing configs, etc.).
 4. Produce a numbered execution plan that the downstream Critic and Coder agents
@@ -36,6 +41,9 @@ Be concise.  Output ONLY the plan, no preamble.
 
 --- USER REQUEST ---
 {deploy_prompt}
+
+--- DEPLOY TARGET ---
+{deploy_target}
 
 --- CODEBASE ---
 {codebase}
@@ -77,8 +85,10 @@ def orchestrator_node(state: BugRewindState) -> dict:
     logger.info("📂 Backup of original codebase at: %s", backup_path)
 
     # ── Step 3: Ask the LLM for an execution plan ─────────────────────────
+    deploy_target = state.get("deploy_target", "docker")
     prompt = ORCHESTRATOR_PROMPT.format(
         deploy_prompt=deploy_prompt,
+        deploy_target=deploy_target,
         codebase=codebase[:30_000],  # cap to avoid blowing the context window
     )
 
