@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Coffee, Shield, Code, Container, FileText, CheckCircle, Activity, Terminal, Cpu } from 'lucide-react';
+import { Coffee, Shield, Code, Container, FileText, CheckCircle, Activity, Terminal, Cpu, Info, X } from 'lucide-react';
 
 const AGENT_NODES = [
   { id: 'orchestrator', label: 'Orchestrator', icon: Coffee },
@@ -30,6 +30,7 @@ function App() {
     docker_status: ''
   });
   const [isRunning, setIsRunning] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
 
   const logEndRef = useRef(null);
   const ws = useRef(null);
@@ -103,6 +104,15 @@ function App() {
           <h1 style={{ fontWeight: 800, fontSize: '1.75rem', letterSpacing: '-0.02em', margin: 0, background: 'linear-gradient(135deg, #ece0d1, #967259)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>BugRewind</h1>
         </div>
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flex: 1, maxWidth: '600px', marginLeft: '40px' }}>
+          <button 
+            style={{ background: 'transparent', border: 'none', color: '#dbc1ac', cursor: 'pointer', padding: '8px', borderRadius: '50%', display: 'flex', transition: 'transform 0.2s' }}
+            onClick={() => setShowInfoModal(true)}
+            onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+            onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+            title="Connection Info"
+          >
+            <Info size={24} />
+          </button>
           <input
             className="input-field"
             placeholder="Repository Path (Absolute)"
@@ -269,6 +279,47 @@ function App() {
           </div>
         </div>
       </div>
+      
+      {/* Connection Info Modal */}
+      {showInfoModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999
+        }}>
+          <div className="panel" style={{ width: '600px', maxWidth: '90%', padding: '32px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ margin: 0, color: '#dbc1ac', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.5rem', fontWeight: 800 }}><Info size={28} /> Integration Guide</h2>
+              <button 
+                onClick={() => setShowInfoModal(false)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--color-text-dim)', cursor: 'pointer', display: 'flex' }}
+              >
+                <X size={28} />
+              </button>
+            </div>
+            
+            <h3 style={{ fontSize: '1.1rem', color: '#ece0d1', marginBottom: '12px' }}>Terminal CLI</h3>
+            <p style={{ fontSize: '0.9rem', color: 'var(--color-text-dim)', marginBottom: '8px' }}>Execute the workflow instantly on any folder straight from your shell:</p>
+            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '16px', borderRadius: '8px', border: '1px solid var(--color-border)', marginBottom: '28px', fontFamily: 'monospace', fontSize: '0.85rem' }}>
+              python -m bugrewind.main &lt;path_to_repo&gt;
+            </div>
+            
+            <h3 style={{ fontSize: '1.1rem', color: '#ece0d1', marginBottom: '12px' }}>MCP Server</h3>
+            <p style={{ fontSize: '0.9rem', color: 'var(--color-text-dim)', marginBottom: '12px', lineHeight: 1.5 }}>
+              BugRewind has a built-in FastMCP interface. To let tools like Claude or Cursor invoke the LangGraph pipeline for you, add this strictly to your config file:
+            </p>
+            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '16px', borderRadius: '8px', border: '1px solid var(--color-border)', fontFamily: 'monospace', fontSize: '0.85rem' }}>
+              <pre style={{ margin: 0, whiteSpace: 'pre-wrap', color: '#dbc1ac' }}>
+{`"bugrewind": {
+  "command": "uv",
+  "args": ["run", "-m", "bugrewind.mcp_server"]
+}`}
+              </pre>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
