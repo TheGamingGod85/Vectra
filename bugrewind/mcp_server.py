@@ -9,6 +9,7 @@ can call ``orchestrator_tool`` to scan, fix, and deploy a local repo.
 from __future__ import annotations
 
 import logging
+import sys
 from fastmcp import FastMCP
 
 from bugrewind.graph.workflow import run_workflow
@@ -16,6 +17,7 @@ from bugrewind.graph.workflow import run_workflow
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s — %(message)s",
+    stream=sys.stderr,
 )
 logger = logging.getLogger(__name__)
 
