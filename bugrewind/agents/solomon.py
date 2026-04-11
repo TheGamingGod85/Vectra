@@ -218,6 +218,30 @@ def vercel_deploy_node(state: BugRewindState) -> dict:
         log_entry = f"[VercelDeploy] Deployed successfully → {deploy_url}"
         logger.info("✅ " + log_entry)
 
+        # Trigger desktop agent check
+        import subprocess
+        import sys
+        from pathlib import Path
+        
+        deskagent_dir = Path(__file__).parent.parent.parent / "deskagent"
+        deskagent_main = deskagent_dir / "main.py"
+        
+        if deskagent_main.exists():
+            logger.info("🤖 Triggering Desk Agent for deployment verification...")
+            check_query = "Please check if the website is loaded and reachable, verify that a JSON response or frontend is visible. Report deployment status."
+            
+            try:
+                # Spawn an independent background process
+                subprocess.Popen(
+                    ["start", "cmd", "/k", sys.executable, "main.py", "--initial_url", deploy_url, "--query", check_query],
+                    cwd=str(deskagent_dir),
+                    shell=True
+                )
+                log_entry += "\n[DeskAgent] Triggered deployment verification."
+            except Exception as e:
+                logger.error(f"Failed to launch Desk Agent: {e}")
+                log_entry += f"\n[DeskAgent] Failed to trigger: {e}"
+
         # Optionally inspect the deployment
         _, inspect_log = vercel_inspect(
             deployment_url=deploy_url,
