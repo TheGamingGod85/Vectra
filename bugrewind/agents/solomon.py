@@ -238,21 +238,38 @@ def vercel_deploy_node(state: BugRewindState) -> dict:
                         cwd=str(deskagent_dir),
                         shell=True
                     )
+                    msg = "[DeskAgent] Triggered deployment verification in new terminal window."
+                    logger.info(msg)
+                    log_entry += "\n" + msg
                 else:
-                    # On Linux/macOS/WSL, run in the background and pipe output to a log file
-                    log_path = deskagent_dir / "deskagent_run.log"
-                    log_file = open(log_path, "a")
-                    subprocess.Popen(
-                        [sys.executable, "main.py", "--initial_url", deploy_url, "--query", check_query],
-                        cwd=str(deskagent_dir),
-                        stdout=log_file,
-                        stderr=subprocess.STDOUT
-                    )
-                    log_entry += f"\n[DeskAgent] Running in background (WSL/Linux). Logs at {log_path}"
-                log_entry += "\n[DeskAgent] Triggered deployment verification."
+                    # On Linux/macOS/WSL, we want to force the visual terminal popup to retain the 'gimmick'.
+                    # We can use cmd.exe interop to open a native Windows terminal that runs the WSL python command.
+                    import shlex
+                    safe_query = shlex.quote(check_query)
+                    wsl_command = f"wsl.exe --cd {shlex.quote(str(deskagent_dir))} -e {sys.executable} main.py --initial_url {deploy_url} --query {safe_query}"
+                    
+                    try:
+                        subprocess.Popen(["cmd.exe", "/c", "start", "cmd", "/k", wsl_command], cwd=str(deskagent_dir))
+                        msg = "[DeskAgent] Triggered deployment verification via cross-platform WSL popup window."
+                        logger.info("🤖 " + msg)
+                        log_entry += "\n" + msg
+                    except FileNotFoundError:
+                        # Fallback if cmd.exe interop is disabled or not available
+                        log_path = deskagent_dir / "deskagent_run.log"
+                        log_file = open(log_path, "a")
+                        subprocess.Popen(
+                            [sys.executable, "main.py", "--initial_url", deploy_url, "--query", check_query],
+                            cwd=str(deskagent_dir),
+                            stdout=log_file,
+                            stderr=subprocess.STDOUT
+                        )
+                        msg = f"[DeskAgent] Triggered verification in background (WSL/Linux). Logs saved to: {log_path}"
+                        logger.info("🤖 " + msg)
+                        log_entry += "\n" + msg
             except Exception as e:
-                logger.error(f"Failed to launch Desk Agent: {e}")
-                log_entry += f"\n[DeskAgent] Failed to trigger: {e}"
+                err_msg = f"Failed to launch Desk Agent: {e}"
+                logger.error(err_msg)
+                log_entry += f"\n[DeskAgent] {err_msg}"
 
         # Optionally inspect the deployment
         _, inspect_log = vercel_inspect(
