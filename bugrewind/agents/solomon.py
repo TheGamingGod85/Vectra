@@ -231,12 +231,24 @@ def vercel_deploy_node(state: BugRewindState) -> dict:
             check_query = "Please check if the website is loaded and reachable, verify that a JSON response or frontend is visible. Report deployment status."
             
             try:
-                # Spawn an independent background process
-                subprocess.Popen(
-                    ["start", "cmd", "/k", sys.executable, "main.py", "--initial_url", deploy_url, "--query", check_query],
-                    cwd=str(deskagent_dir),
-                    shell=True
-                )
+                # Check platform to spawn correctly. Windows can use 'start cmd' to show a terminal.
+                if sys.platform == "win32":
+                    subprocess.Popen(
+                        ["start", "cmd", "/k", sys.executable, "main.py", "--initial_url", deploy_url, "--query", check_query],
+                        cwd=str(deskagent_dir),
+                        shell=True
+                    )
+                else:
+                    # On Linux/macOS/WSL, run in the background and pipe output to a log file
+                    log_path = deskagent_dir / "deskagent_run.log"
+                    log_file = open(log_path, "a")
+                    subprocess.Popen(
+                        [sys.executable, "main.py", "--initial_url", deploy_url, "--query", check_query],
+                        cwd=str(deskagent_dir),
+                        stdout=log_file,
+                        stderr=subprocess.STDOUT
+                    )
+                    log_entry += f"\n[DeskAgent] Running in background (WSL/Linux). Logs at {log_path}"
                 log_entry += "\n[DeskAgent] Triggered deployment verification."
             except Exception as e:
                 logger.error(f"Failed to launch Desk Agent: {e}")
