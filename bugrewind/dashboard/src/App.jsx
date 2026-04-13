@@ -23,6 +23,17 @@ const VERCEL_NODES = [
   { id: 'summary', label: 'Summary', icon: FileText },
 ];
 
+const KUBERNETES_NODES = [
+  { id: 'orchestrator', label: 'Orchestrator', icon: Coffee },
+  { id: 'critic', label: 'Critic', icon: Shield },
+  { id: 'coder', label: 'Coder', icon: Code },
+  { id: 'docker_gen', label: 'Docker Gen', icon: Container },
+  { id: 'validation', label: 'Validation', icon: Activity },
+  { id: 'kubernetes_gen', label: 'K8s Gen', icon: FileText },
+  { id: 'kubernetes_deploy', label: 'K8s Deploy', icon: Globe },
+  { id: 'summary', label: 'Summary', icon: FileText },
+];
+
 function App() {
   const [activeTab, setActiveTab] = useState('deploy');
   const [repoPath, setRepoPath] = useState('');
@@ -46,11 +57,14 @@ function App() {
     vercel_deploy_url: '',
     vercel_deploy_log: '',
     vercel_status: '',
+    kubernetes_manifests: '',
+    kubernetes_deploy_log: '',
+    kubernetes_status: '',
   });
   const [isRunning, setIsRunning] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
 
-  const AGENT_NODES = deployTarget === 'vercel' ? VERCEL_NODES : DOCKER_NODES;
+  const AGENT_NODES = deployTarget === 'vercel' ? VERCEL_NODES : deployTarget === 'kubernetes' ? KUBERNETES_NODES : DOCKER_NODES;
 
   const logEndRef = useRef(null);
   const ws = useRef(null);
@@ -110,6 +124,7 @@ function App() {
       plan: '', file_manifest: {}, iteration: 0, max_iterations: 3,
       docker_build_log: '', docker_run_log: '', docker_status: '',
       vercel_json: '', vercel_deploy_url: '', vercel_deploy_log: '', vercel_status: '',
+      kubernetes_manifests: '', kubernetes_deploy_log: '', kubernetes_status: '',
     });
 
     try {
@@ -182,6 +197,21 @@ function App() {
               />
               <Globe size={16} />
               <span>Vercel</span>
+            </label>
+            <label
+              className={`deploy-target-option ${deployTarget === 'kubernetes' ? 'active' : ''}`}
+              title="Deploy to Kubernetes cluster"
+            >
+              <input
+                type="radio"
+                name="deployTarget"
+                value="kubernetes"
+                checked={deployTarget === 'kubernetes'}
+                onChange={(e) => setDeployTarget(e.target.value)}
+                disabled={isRunning}
+              />
+              <Container size={16} />
+              <span>Kubernetes</span>
             </label>
           </div>
 
@@ -420,6 +450,34 @@ function App() {
                     <summary style={{ cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-accent)' }}>Run Log</summary>
                     <pre style={{ marginTop: '8px', padding: '12px', background: 'rgba(0,0,0,0.4)', borderRadius: '6px', fontSize: '0.7rem', maxHeight: '150px', overflowY: 'auto', fontFamily: 'monospace', color: '#ece0d1', whiteSpace: 'pre-wrap' }}>
                       {state.docker_run_log}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            )}
+
+            {/* Kubernetes Output (Kubernetes target) */}
+            {deployTarget === 'kubernetes' && (state.kubernetes_manifests || state.kubernetes_deploy_log) && (
+              <div style={{ padding: '16px', background: 'rgba(0, 0, 0, 0.2)', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
+                <div style={{ color: 'var(--color-text-dim)', fontSize: '0.85rem', fontWeight: 800, marginBottom: '12px', letterSpacing: '0.05em', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>KUBERNETES OUTPUT</span>
+                  {state.kubernetes_status && <span style={{ color: state.kubernetes_status.includes('fail') ? '#f87171' : '#10b981' }}>{state.kubernetes_status}</span>}
+                </div>
+                
+                {state.kubernetes_manifests && (
+                  <details style={{ marginBottom: '8px' }}>
+                    <summary style={{ cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-accent)' }}>Manifests</summary>
+                    <pre style={{ marginTop: '8px', padding: '12px', background: 'rgba(0,0,0,0.4)', borderRadius: '6px', fontSize: '0.7rem', maxHeight: '150px', overflowY: 'auto', fontFamily: 'monospace', color: '#ece0d1', whiteSpace: 'pre-wrap' }}>
+                      {state.kubernetes_manifests}
+                    </pre>
+                  </details>
+                )}
+                
+                {state.kubernetes_deploy_log && (
+                  <details>
+                    <summary style={{ cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-accent)' }}>Deploy Log</summary>
+                    <pre style={{ marginTop: '8px', padding: '12px', background: 'rgba(0,0,0,0.4)', borderRadius: '6px', fontSize: '0.7rem', maxHeight: '150px', overflowY: 'auto', fontFamily: 'monospace', color: '#ece0d1', whiteSpace: 'pre-wrap' }}>
+                      {state.kubernetes_deploy_log}
                     </pre>
                   </details>
                 )}

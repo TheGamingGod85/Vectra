@@ -268,6 +268,86 @@ def vercel_deploy_node(state: BugRewindState) -> dict:
     }
 
 
+def kubernetes_deploy_node(state: BugRewindState) -> dict:
+    """LangGraph node: Kubernetes Deploy.
+
+    Applies the generated Kubernetes manifests.
+    """
+    import subprocess
+    repo_path = state["repo_path"]
+    logs = state.get("logs", "")
+    manifests = state.get("kubernetes_manifests", "")
+
+    if not manifests:
+        log_entry = "[KubernetesDeploy] Skipping, no manifests."
+        return {
+            "kubernetes_status": "deploy_skipped",
+            "logs": logs + "\n" + log_entry,
+        }
+
+    logger.info("🚀 Kubernetes Deploy: applying manifests …")
+    
+    deploy_log = ""
+    # ── Handle kind clusters (requires image loading) ──
+    try:
+        ctx_cmd = ["kubectl", "config", "current-context"]
+        ctx_res = subprocess.run(ctx_cmd, capture_output=True, text=True)
+        context = ctx_res.stdout.strip()
+        if context.startswith("kind-"):
+            cluster_name = context.replace("kind-", "")
+            logger.info("🛶 Detected kind cluster '%s' — loading image …", cluster_name)
+            load_cmd = ["kind", "load", "docker-image", "bugrewind-app:latest", "--name", cluster_name]
+            load_res = subprocess.run(load_cmd, capture_output=True, text=True)
+            deploy_log += f"--- kind load output ---\n{load_res.stdout}\n{load_res.stderr}\n"
+            if load_res.returncode == 0:
+                logger.info("✅ Image loaded into kind cluster.")
+            else:
+                logger.warning("⚠️ Failed to load image into kind. Deployment might fail to pull.")
+    except Exception as e:
+        logger.warning("Could not check/load kind image: %s", e)
+
+    cmd = ["kubectl", "apply", "-f", "k8s-manifest.yaml"]
+    try:
+        result = subprocess.run(cmd, cwd=repo_path, capture_output=True, text=True)
+        deploy_log += "--- kubectl apply output ---\n" + result.stdout + "\n" + result.stderr
+        success = result.returncode == 0
+    except Exception as e:
+        success = False
+        deploy_log += "\nError: " + str(e)
+
+    if success:
+        status = "deployed"
+        log_entry = "[KubernetesDeploy] Deployed successfully to Kubernetes."
+        logger.info("✅ " + log_entry)
+        
+        try:
+            import uuid
+            from bugrewind.utils.db import insert_container
+            record_id = str(uuid.uuid4())
+            container_id = "bugrewind-k8s"
+            target_email = state.get("target_email", "marcus32holloway@gmail.com")
+            insert_container(
+                record_id=record_id,
+                container_id=container_id,
+                repository_path=repo_path,
+                target_email=target_email,
+            )
+            log_entry += f"\n[KubernetesDeploy] Registered K8s for monitoring (id={record_id})."
+        except Exception as exc:
+            logger.warning("Could not register k8s for monitoring: %s", exc)
+
+    else:
+        status = "deploy_failed"
+        log_entry = f"[KubernetesDeploy] Deployment failed.\n{deploy_log[:500]}"
+        logger.error(log_entry)
+
+    return {
+        "kubernetes_deploy_log": deploy_log,
+        "kubernetes_status": status,
+        "logs": logs + "\n" + log_entry,
+    }
+
+
 def summary_node(state: BugRewindState) -> dict:
     """LangGraph node: Summary.
 
@@ -295,7 +375,7 @@ def summary_node(state: BugRewindState) -> dict:
         f"**Repository:** `{repo_path}`",
         f"**Deploy Target:** `{deploy_target}`",
         f"**Iterations:** {iteration}",
-        f"**Docker Status:** `{docker_status}`" if deploy_target == "docker" else f"**Vercel Status:** `{vercel_status}`",
+        f"**Kubernetes Status:** `{state.get('kubernetes_status', 'unknown')}`" if deploy_target == "kubernetes" else f"**Docker Status:** `{docker_status}`" if deploy_target == "docker" else f"**Vercel Status:** `{vercel_status}`",
         f"**Total Issues Found:** {len(issues)}",
         f"**Total Patches Applied:** {len(patches)}",
         "",
@@ -360,6 +440,21 @@ def summary_node(state: BugRewindState) -> dict:
             "```",
             "",
         ]
+    elif deploy_target == "kubernetes":
+        lines += [
+            "## Kubernetes Deployment Log (last 50 lines)",
+            "",
+            "```",
+            "\n".join((state.get("kubernetes_deploy_log", "") or "N/A").splitlines()[-50:]),
+            "```",
+            "",
+            "## Kubernetes Manifests",
+            "",
+            "```yaml",
+            state.get("kubernetes_manifests", "N/A"),
+            "```",
+            "",
+        ]
     else:
         lines += [
             "## Docker Build Log (last 50 lines)",
@@ -404,6 +499,16 @@ def summary_node(state: BugRewindState) -> dict:
             lines.append("⚠️ **Vercel deployment was skipped.**")
         else:
             lines.append(f"ℹ️ Vercel status: `{vercel_status}`")
+    elif deploy_target == "kubernetes":
+        k8s_status = state.get("kubernetes_status", "unknown")
+        if k8s_status == "deployed":
+            lines.append("✅ **Kubernetes Deployment succeeded.**  Resources are running.")
+        elif k8s_status == "deploy_failed":
+            lines.append("❌ **Kubernetes Deployment failed.**  See logs above.")
+        elif k8s_status == "deploy_skipped":
+            lines.append("⚠️ **Kubernetes deployment was skipped.**")
+        else:
+            lines.append(f"ℹ️ Kubernetes status: `{k8s_status}`")
     else:
         if docker_status == "deployed":
             lines.append("✅ **Deployment succeeded.**  Container is running.")

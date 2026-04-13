@@ -914,5 +914,31 @@ def coder_node(state: BugRewindState) -> dict:
     }
 
 
+def kubernetes_gen_node(state: BugRewindState) -> dict:
+    """LangGraph node: Kubernetes Manifest Generation.
 
+    Generates Kubernetes manifests (Deployment, Service) for the application.
+    """
+    repo_path = state["repo_path"]
+    logs = state.get("logs", "")
+    plan = state.get("plan", "")
 
+    prompt = f"Generate a minimal Kubernetes Deployment and Service YAML to run this application. Use 'bugrewind-app' as the app name and 'bugrewind-app:latest' as the image.\n\nPlan context:\n{plan}\n\nOutput only valid YAML, no markdown formatting."
+    logger.info("☸️ Kubernetes Gen: generating manifests …")
+    manifests = call_ollama(prompt)
+    
+    manifests = manifests.strip()
+    if manifests.startswith("```"):
+        lines = manifests.splitlines()
+        manifests = "\n".join(lines[1:])
+    if manifests.endswith("```"):
+        manifests = manifests[: -len("```")].strip()
+        
+    apply_patch(repo_path, "k8s-manifest.yaml", manifests)
+    log_entry = "[KubernetesGen] Generated k8s-manifest.yaml."
+    logger.info(log_entry)
+
+    return {
+        "kubernetes_manifests": manifests,
+        "logs": logs + "\n" + log_entry,
+    }

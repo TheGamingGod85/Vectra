@@ -47,6 +47,9 @@ class BugRewindState(TypedDict):
         vercel_deploy_url:  The URL returned by ``vercel deploy``.
         vercel_deploy_log:  Stdout/stderr from the Vercel CLI.
         vercel_status:      High-level status string, e.g. "deployed", "deploy_failed".
+        kubernetes_manifests: Generated Kubernetes YAML manifests.
+        kubernetes_deploy_log: Stdout/stderr from kubectl apply.
+        kubernetes_status:  High-level status string, e.g. "deployed", "deploy_failed".
         logs:               Human-readable running log of all agent activity.
         summary:            Final markdown summary written to outputs/summary.md.
     """
@@ -73,5 +76,8 @@ class BugRewindState(TypedDict):
     vercel_deploy_url: str
     vercel_deploy_log: str
     vercel_status: str
+    kubernetes_manifests: str
+    kubernetes_deploy_log: str
+    kubernetes_status: str
     logs: str
     summary: str

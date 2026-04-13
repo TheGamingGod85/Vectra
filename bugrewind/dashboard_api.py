@@ -160,6 +160,9 @@ async def execute_workflow(req: runRequest):
         "vercel_deploy_url": "",
         "vercel_deploy_log": "",
         "vercel_status": "",
+        "kubernetes_manifests": "",
+        "kubernetes_deploy_log": "",
+        "kubernetes_status": "",
         "logs": "[BugRewind] Dashboard-triggered workflow started.",
         "summary": "",
     }

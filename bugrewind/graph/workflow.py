@@ -12,6 +12,10 @@ Defines the complete multi-agent workflow as a compiled LangGraph StateGraph:
     START → orchestrator → critic → coder → critic (loop) →
     vercel_setup → vercel_deploy → summary → END
 
+  Kubernetes path (when user mentions kubernetes/k8s):
+    START → orchestrator → critic → coder → critic (loop) →
+    docker_gen → validation → kubernetes_gen → kubernetes_deploy → summary → END
+
 The Critic ↔ Coder loop runs until either:
   • No issues remain, OR
   • ``max_iterations`` is reached, OR
@@ -30,12 +34,13 @@ from langgraph.graph import StateGraph, START, END
 from bugrewind.graph.state import BugRewindState
 from bugrewind.agents.orchestrator import orchestrator_node
 from bugrewind.agents.critic import critic_node
-from bugrewind.agents.coder import coder_node, docker_gen_node
+from bugrewind.agents.coder import coder_node, docker_gen_node, kubernetes_gen_node
 from bugrewind.agents.solomon import (
     validation_node,
     solomon_node,
     vercel_setup_node,
     vercel_deploy_node,
+    kubernetes_deploy_node,
     summary_node,
 )
 
@@ -85,47 +90,48 @@ def should_continue_fixing(state: BugRewindState) -> str:
 
 
 def should_deploy_docker_or_vercel(state: BugRewindState) -> str:
-    """Choose between Docker and Vercel deployment pipelines.
+    """Choose between deployment pipelines.
 
-    Inspects ``state["deploy_target"]`` (set by ``run_workflow`` based on
-    the user's prompt) to decide the deployment path.
+    Inspects ``state["deploy_target"]`` to decide the deployment path.
 
     Returns:
         ``"docker_gen"``    – traditional Docker build + container deployment.
         ``"vercel_setup"``  – Vercel Serverless Function deployment.
+        ``"kubernetes_gen"`` – Kubernetes manifests generation.
     """
     target = state.get("deploy_target", "docker")
 
     if target == "vercel":
         logger.info("🌐 Deploy target is Vercel → routing to vercel_setup.")
         return "vercel_setup"
+    elif target == "kubernetes":
+        logger.info("☸️ Deploy target is Kubernetes → routing to docker_gen for build, then k8s.")
+        return "docker_gen"
 
     logger.info("🐳 Deploy target is Docker → routing to docker_gen.")
     return "docker_gen"
 
 
 def should_deploy_or_retry(state: BugRewindState) -> str:
-    """After validation (docker build), decide next step.
-
-    Returns:
-        ``"solomon"`` – build succeeded, proceed to deployment.
-        ``"critic"``  – build failed AND we haven't exceeded build retries.
-        ``"solomon"`` – build failed BUT we've exhausted retries → deploy anyway
-                        (solomon will handle the failed status gracefully).
-    """
+    """After validation (docker build), decide next step."""
     status = state.get("docker_status", "")
     build_attempts = state.get("build_attempts", 1)
+    target = state.get("deploy_target", "docker")
 
     if status == "build_success":
-        logger.info("✅ Build succeeded → deploying with Solomon.")
-        return "solomon"
+        if target == "kubernetes":
+            logger.info("✅ Build succeeded → generating Kubernetes manifests.")
+            return "kubernetes_gen"
+        else:
+            logger.info("✅ Build succeeded → deploying with Solomon.")
+            return "solomon"
 
     if build_attempts >= MAX_BUILD_RETRIES:
         logger.warning(
-            "❌ Build failed after %d attempt(s) — giving up, moving to Solomon/Summary.",
+            "❌ Build failed after %d attempt(s) — giving up, moving to deploy/Summary.",
             build_attempts,
         )
-        return "solomon"
+        return "kubernetes_gen" if target == "kubernetes" else "solomon"
 
     logger.warning(
         "❌ Build failed (attempt %d/%d) → sending logs back to Critic.",
@@ -156,6 +162,9 @@ def build_workflow() -> StateGraph:
     # Vercel path nodes
     builder.add_node("vercel_setup", vercel_setup_node)
     builder.add_node("vercel_deploy", vercel_deploy_node)
+    # Kubernetes path nodes
+    builder.add_node("kubernetes_gen", kubernetes_gen_node)
+    builder.add_node("kubernetes_deploy", kubernetes_deploy_node)
     # Shared
     builder.add_node("summary", summary_node)
 
@@ -200,12 +209,19 @@ def build_workflow() -> StateGraph:
         should_deploy_or_retry,
         {
             "solomon": "solomon",
+            "kubernetes_gen": "kubernetes_gen",
             "critic": "critic",
         },
     )
 
     # Solomon → Summary
     builder.add_edge("solomon", "summary")
+    
+    # K8s gen -> k8s deploy
+    builder.add_edge("kubernetes_gen", "kubernetes_deploy")
+    
+    # k8s deploy -> summary
+    builder.add_edge("kubernetes_deploy", "summary")
 
     # ── Vercel deployment path ─────────────────────────────────────────
     # Vercel setup → Vercel deploy
@@ -224,18 +240,21 @@ def build_workflow() -> StateGraph:
 
 
 def _detect_deploy_target(deploy_prompt: str) -> str:
-    """Infer the deployment target from the user's prompt.
-
-    Scans for Vercel-related keywords.  Defaults to ``"docker"``.
-    """
+    """Infer the deployment target from the user's prompt."""
     vercel_keywords = {
         "vercel", "serverless", "cloud function", "edge function",
         "vercel deploy", "serverless function",
+    }
+    kubernetes_keywords = {
+        "kubernetes", "k8s", "cluster", "minikube", "kubectl",
     }
     prompt_lower = deploy_prompt.lower()
     for kw in vercel_keywords:
         if kw in prompt_lower:
             return "vercel"
+    for kw in kubernetes_keywords:
+        if kw in prompt_lower:
+            return "kubernetes"
     return "docker"
 
 
@@ -285,6 +304,9 @@ def run_workflow(
         "vercel_deploy_url": "",
         "vercel_deploy_log": "",
         "vercel_status": "",
+        "kubernetes_manifests": "",
+        "kubernetes_deploy_log": "",
+        "kubernetes_status": "",
         "logs": "[BugRewind] Workflow started.",
         "summary": "",
     }
@@ -292,11 +314,11 @@ def run_workflow(
     logger.info("🚀 Starting BugRewind workflow for %s", repo_path)
     final_state = workflow.invoke(initial_state)
 
-    final_status = (
-        final_state.get("vercel_status", "unknown")
-        if resolved_target == "vercel"
-        else final_state.get("docker_status", "unknown")
-    )
+    final_status = final_state.get("docker_status", "unknown")
+    if resolved_target == "vercel":
+        final_status = final_state.get("vercel_status", "unknown")
+    elif resolved_target == "kubernetes":
+        final_status = final_state.get("kubernetes_status", "unknown")
     logger.info("🏁 Workflow complete. Deploy status: %s", final_status)
 
     return final_state

@@ -32,6 +32,8 @@ from the user, and a deployment target.  Your job is to:
      Serverless Function deployment.  The FastAPI app must be accessible via an
      ``api/`` directory entry point (e.g. ``api/main.py``).  Note any restructuring
      needed to make the project compatible with Vercel's Python runtime.
+   - If the target is **kubernetes**: plan for Dockerfile, .dockerignore, and Kubernetes
+     manifests (Deployment, Service) to run the application in a cluster.
 3. List the areas of concern the Critic agent should focus on (secrets, unsafe
    shell usage, dependency risks, missing configs, etc.).
 4. Produce a numbered execution plan that the downstream Critic and Coder agents

@@ -46,9 +46,9 @@ def main() -> None:
     )
     parser.add_argument(
         "--target",
-        choices=["docker", "vercel"],
+        choices=["docker", "vercel", "kubernetes"],
         default=None,
-        help="Deployment target (docker or vercel). Auto-detected from prompt if omitted.",
+        help="Deployment target (docker, vercel, or kubernetes). Auto-detected from prompt if omitted.",
     )
 
     args = parser.parse_args()
@@ -102,6 +102,17 @@ def main() -> None:
             sys.exit(1)
         else:
             print(f"\nℹ️  Final Vercel status: {vercel_status}")
+            sys.exit(0)
+    elif deploy_target == "kubernetes":
+        k8s_status = final_state.get("kubernetes_status", "unknown")
+        if k8s_status == "deployed":
+            print("\n✅ Kubernetes deployment successful!  Resources created.")
+            sys.exit(0)
+        elif k8s_status == "deploy_failed":
+            print(f"\n❌ Kubernetes deployment failed (status: {k8s_status}).")
+            sys.exit(1)
+        else:
+            print(f"\nℹ️  Final Kubernetes status: {k8s_status}")
             sys.exit(0)
     else:
         docker_status = final_state.get("docker_status", "unknown")
