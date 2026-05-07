@@ -1,5 +1,5 @@
 """
-BugRewind Vercel Tools.
+Vectra Vercel Tools.
 
 Provides helpers for deploying FastAPI applications to Vercel via the
 Vercel CLI (``vercel``).  Mirrors the ``docker_tools`` pattern — each

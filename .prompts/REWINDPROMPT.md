@@ -1,18 +1,18 @@
-# Comprehensive Build Specification: RewindWatcher
+# Comprehensive Build Specification: Sentinel
 
 **Objective**: 
-Create **RewindWatcher**, a standalone background monitoring daemon and post-mortem AI diagnostics engine. This tool runs entirely independently of the existing **BugRewind** dashboard, monitoring containers that BugRewind has successfully deployed. Upon detecting a container crash, RewindWatcher triggers a localized LangGraph workflow to diagnose the root cause, map it to the original source code, and dispatch targeted email notifications.
+Create **Sentinel**, a standalone background monitoring daemon and post-mortem AI diagnostics engine. This tool runs entirely independently of the existing **Vectra** dashboard, monitoring containers that Vectra has successfully deployed. Upon detecting a container crash, Sentinel triggers a localized LangGraph workflow to diagnose the root cause, map it to the original source code, and dispatch targeted email notifications.
 
-This document serves as a strict technical specification for an AI agent to implement RewindWatcher and modify BugRewind accordingly.
+This document serves as a strict technical specification for an AI agent to implement Sentinel and modify Vectra accordingly.
 
 ---
 
-## 1. BugRewind System Modifications (The Handoff)
+## 1. Vectra System Modifications (The Handoff)
 
-We must establish a decoupled handoff mechanism so BugRewind can tell RewindWatcher what to monitor without blocking its own UI or LangGraph execution.
+We must establish a decoupled handoff mechanism so Vectra can tell Sentinel what to monitor without blocking its own UI or LangGraph execution.
 
 ### 1.1 Database Initialization
-Create a new file `bugrewind/utils/db.py` to initialize a SQLite database `monitored_containers.sqlite` in the project root. 
+Create a new file `vectra/utils/db.py` to initialize a SQLite database `monitored_containers.sqlite` in the project root. 
 **Schema Requirement**:
 ```sql
 CREATE TABLE IF NOT EXISTS containers (
@@ -26,14 +26,14 @@ CREATE TABLE IF NOT EXISTS containers (
 ```
 
 ### 1.2 Deployment Hook in `solomon.py`
-In `bugrewind/agents/solomon.py`, locate the `solomon_node` or `validation_node` where Docker `run` is executed successfully. Upon a successful run:
+In `vectra/agents/solomon.py`, locate the `solomon_node` or `validation_node` where Docker `run` is executed successfully. Upon a successful run:
 1. Generate a UUID for the record.
 2. Insert a row into the database linking the `container_id` returned by Docker to the `state["repo_path"]`.
 3. Provide a default fallback email (e.g., `marcus32holloway@gmail.com`) if a real one is not present in the state.
 
 ---
 
-## 2. RewindWatcher Architecture (`watcher/`)
+## 2. Sentinel Architecture (`watcher/`)
 
 Create a new directory named `watcher` at the project root. This service must run in its own Python process.
 
@@ -55,7 +55,7 @@ When an `exited` container is found, execute a forensics script to collect the s
 
 ## 3. Post-Mortem AI Workflow (LangGraph)
 
-Create `watcher/graph.py` and `watcher/agents.py`. This workflow operates entirely independently of BugRewind's main deployment graph.
+Create `watcher/graph.py` and `watcher/agents.py`. This workflow operates entirely independently of Vectra's main deployment graph.
 
 ### 3.1 Watcher State (`WatcherState` TypedDict)
 ```python
@@ -98,11 +98,11 @@ Implement a `dispatcher_node` at the end of the LangGraph workflow:
 For both cases below, the **Recipient** is the `target_email`:
 
 * **IF `root_cause_category == 'infrastructure'`:**
-  - **Subject**: [RewindWatcher Alert] Container {id} crashed due to Configuration Error
+  - **Subject**: [Sentinel Alert] Container {id} crashed due to Configuration Error
   - **Body**: Include the `diagnostic_report`. Inform the user that infrastructural configuration (like environment variables or linked services) needs to be corrected in their local environment/prompt.
 
 * **IF `root_cause_category == 'source_code'`:**
-  - **Subject**: [RewindWatcher Alert] Code Exception in Container {id}
+  - **Subject**: [Sentinel Alert] Code Exception in Container {id}
   - **Body**: Include the full log trace, `diagnostic_report`, and the `fix_recommendation` produced by the PM Coder. Point out the optimized source reference (file path and line number) derived from the `repo_path` context so they can easily apply the fix to the source.
 
 * **Action Output**: Implement real email dispatch using `smtplib`. Configure it to use Gmail SMTP (`smtp.gmail.com:587`). Read the sender credentials from environment variables (`SMTP_USER` and `SMTP_APP_PASSWORD`). Send actual emails to the designated `target_email` address.
@@ -110,6 +110,6 @@ For both cases below, the **Recipient** is the `target_email`:
 ---
 
 ## 5. Execution & Tooling Requirements
-- **LLM Consistency**: The watcher must utilize the exact same Ollama / LLM abstraction layer found in `bugrewind.utils.llm` to ensure model consistency.
+- **LLM Consistency**: The watcher must utilize the exact same Ollama / LLM abstraction layer found in `vectra.utils.llm` to ensure model consistency.
 - **Isolation**: Running `python watcher/monitor.py` should start a foreground blocking process that handles the scheduling and AI execution without requiring `uvicorn` or any web dependencies. 
 - **Graceful Failure**: If the LLM is down or times out during Post-Mortem Analysis, log the timeout to the console but do not crash the watcher loop. Try the analysis again on the next polling cycle.

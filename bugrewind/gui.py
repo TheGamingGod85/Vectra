@@ -1,5 +1,5 @@
 """
-BugRewind GUI Launcher.
+Vectra GUI Launcher.
 
 Starts the FastAPI backend and the Vite frontend dev server concurrently.
 """
@@ -27,9 +27,9 @@ def _terminate_process(proc, name):
 
 def launch():
     project_root = Path(__file__).parent.parent.resolve()
-    dashboard_dir = project_root / "bugrewind" / "dashboard"
+    dashboard_dir = project_root / "vectra" / "dashboard"
 
-    print("☕ Starting BugRewind Dashboard...")
+    print("☕ Starting Vectra Dashboard...")
 
     if not dashboard_dir.exists():
         print(f"❌ Dashboard directory not found: {dashboard_dir}")
@@ -46,7 +46,7 @@ def launch():
         # Start Backend
         print("➤ Launching Backend (FastAPI) on port 8000...")
         backend_proc = subprocess.Popen(
-            [sys.executable, "-m", "uvicorn", "bugrewind.dashboard_api:app", "--reload"],
+            [sys.executable, "-m", "uvicorn", "vectra.dashboard_api:app", "--reload"],
             cwd=project_root,
         )
 

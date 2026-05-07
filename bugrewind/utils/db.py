@@ -1,10 +1,10 @@
 """
-BugRewind Database Utility.
+Vectra Database Utility.
 
 Initialises and provides access to the SQLite database
 ``monitored_containers.sqlite`` stored in the project root.
-The database tracks containers deployed by BugRewind so that
-RewindWatcher can monitor them independently.
+The database tracks containers deployed by Vectra so that
+Sentinel can monitor them independently.
 """
 
 from __future__ import annotations

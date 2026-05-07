@@ -1,1 +1,1 @@
-# bugrewind utils package
+# vectra utils package

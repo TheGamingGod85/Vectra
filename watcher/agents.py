@@ -1,9 +1,9 @@
 """
-RewindWatcher Post-Mortem Agent Nodes.
+Sentinel Post-Mortem Agent Nodes.
 
 Contains the PM Critic and PM Coder LangGraph nodes that perform
 post-mortem analysis on crashed containers.  Both nodes reuse the
-same Ollama / LLM abstraction layer from ``bugrewind.utils.llm``
+same Ollama / LLM abstraction layer from ``vectra.utils.llm``
 to ensure model consistency.
 """
 
@@ -12,8 +12,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from bugrewind.utils.llm import call_ollama
-from bugrewind.utils.file_ops import read_repo, build_codebase_text
+from vectra.utils.llm import call_ollama
+from vectra.utils.file_ops import read_repo, build_codebase_text
 
 from watcher.state import WatcherState
 

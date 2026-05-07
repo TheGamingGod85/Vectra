@@ -1,5 +1,5 @@
 """
-BugRewind Dashboard API.
+Vectra Dashboard API.
 
 FastAPI server that exposes the LangGraph workflow over WebSockets 
 for real-time visualization and management.
@@ -14,15 +14,15 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from bugrewind.graph.workflow import build_workflow, _detect_deploy_target
-from bugrewind.graph.state import BugRewindState
+from vectra.graph.workflow import build_workflow, _detect_deploy_target
+from vectra.graph.state import VectraState
 
 # ── Setup ──────────────────────────────────────────────────────────────────
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="BugRewind Dashboard API")
+app = FastAPI(title="Vectra Dashboard API")
 
 # Enable CORS for local dev
 app.add_middleware(
@@ -137,7 +137,7 @@ async def execute_workflow(req: runRequest):
 
     resolved_target = req.deploy_target or _detect_deploy_target(req.deploy_prompt)
 
-    initial_state: BugRewindState = {
+    initial_state: VectraState = {
         "repo_path": req.repo_path,
         "deploy_prompt": req.deploy_prompt,
         "deploy_target": resolved_target,
@@ -160,7 +160,7 @@ async def execute_workflow(req: runRequest):
         "vercel_deploy_url": "",
         "vercel_deploy_log": "",
         "vercel_status": "",
-        "logs": "[BugRewind] Dashboard-triggered workflow started.",
+        "logs": "[Vectra] Dashboard-triggered workflow started.",
         "summary": "",
     }
 
@@ -199,7 +199,7 @@ def serialize_state(state: Dict[str, Any]) -> Dict[str, Any]:
 @app.get("/api/watcher/containers")
 async def get_watcher_containers():
     """Retrieve all monitored containers and watcher statistics."""
-    from bugrewind.utils.db import get_all_containers
+    from vectra.utils.db import get_all_containers
     try:
         containers = get_all_containers()
         
@@ -228,7 +228,7 @@ async def get_watcher_containers():
 @app.delete("/api/watcher/containers/{container_id}")
 async def delete_watcher_container(container_id: str):
     """Delete a monitored container entry."""
-    from bugrewind.utils.db import delete_container
+    from vectra.utils.db import delete_container
     try:
         delete_container(container_id)
         return {"status": "success", "message": f"Container {container_id} deleted."}
@@ -240,7 +240,7 @@ async def delete_watcher_container(container_id: str):
 async def start_watcher_container(container_id: str):
     """Start a docker container by its docker container_id."""
     import docker
-    from bugrewind.utils.db import _get_connection
+    from vectra.utils.db import _get_connection
     try:
         client = docker.from_env()
         # Find exactly the container using container_id

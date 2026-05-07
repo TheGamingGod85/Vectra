@@ -75,9 +75,9 @@ export default function WatcherMetrics() {
       {/* Main Table */}
       <div className="panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div className="panel-title" style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span><Activity size={16} style={{ marginRight: '8px' }}/> Monitored Containers</span>
-          <button 
-            onClick={fetchMetrics} 
+          <span><Activity size={16} style={{ marginRight: '8px' }} /> Monitored Containers</span>
+          <button
+            onClick={fetchMetrics}
             style={{ background: 'none', border: 'none', color: 'var(--color-text-dim)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             disabled={loading}
           >
@@ -89,7 +89,7 @@ export default function WatcherMetrics() {
           {containers.length === 0 ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px', opacity: 0.5, flexDirection: 'column', gap: '10px' }}>
               <Info size={32} />
-              <p>No containers currently tracked by RewindWatcher.</p>
+              <p>No containers currently tracked by Sentinel.</p>
             </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
@@ -105,16 +105,16 @@ export default function WatcherMetrics() {
               </thead>
               <tbody>
                 {containers.map((c) => (
-                  <tr key={c.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }} onMouseOver={(e) => e.currentTarget.style.background='rgba(255,255,255,0.02)'} onMouseOut={(e) => e.currentTarget.style.background='transparent'}>
+                  <tr key={c.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }} onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'} onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}>
                     <td style={{ padding: '12px 8px', fontFamily: 'monospace', color: 'var(--color-accent)' }}>{c.container_id.substring(0, 12)}</td>
                     <td style={{ padding: '12px 8px' }}>{c.repository_path.split(/[\/\\]/).pop()}</td>
                     <td style={{ padding: '12px 8px', color: 'var(--color-text-dim)' }}>{new Date(c.deployed_at).toLocaleString()}</td>
                     <td style={{ padding: '12px 8px' }}>{c.target_email}</td>
                     <td style={{ padding: '12px 8px' }}>
-                      <span style={{ 
-                        padding: '4px 8px', 
-                        borderRadius: '12px', 
-                        background: `${getStatusColor(c.status)}20`, 
+                      <span style={{
+                        padding: '4px 8px',
+                        borderRadius: '12px',
+                        background: `${getStatusColor(c.status)}20`,
                         color: getStatusColor(c.status),
                         fontWeight: 'bold',
                         fontSize: '0.75rem',
@@ -124,7 +124,7 @@ export default function WatcherMetrics() {
                       </span>
                     </td>
                     <td style={{ padding: '12px 8px', textAlign: 'center', display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                      <button 
+                      <button
                         onClick={() => setInspectContainer(c)}
                         style={{ background: 'transparent', border: '1px solid var(--color-border)', borderRadius: '6px', color: 'var(--color-text)', padding: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', transition: 'all 0.2s' }}
                         title="Inspect Container"
@@ -172,20 +172,20 @@ export default function WatcherMetrics() {
               <h2 style={{ margin: 0, color: '#dbc1ac', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.5rem', fontWeight: 800 }}>
                 <Eye size={28} /> Inspect Container
               </h2>
-              <button 
+              <button
                 onClick={() => setInspectContainer(null)}
                 style={{ background: 'transparent', border: 'none', color: 'var(--color-text-dim)', cursor: 'pointer', display: 'flex' }}
               >
                 <X size={28} />
               </button>
             </div>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '70vh', overflowY: 'auto', paddingRight: '8px' }}>
               <div style={{ padding: '16px', background: 'rgba(0, 0, 0, 0.2)', border: '1px solid var(--color-border)', borderRadius: '8px' }}>
                 <div style={{ fontSize: '0.8rem', color: 'var(--color-text-dim)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Container ID</div>
                 <div style={{ fontFamily: 'monospace', fontSize: '1rem', color: 'var(--color-accent)' }}>{inspectContainer.container_id}</div>
               </div>
-              
+
               <div style={{ padding: '16px', background: 'rgba(0, 0, 0, 0.2)', border: '1px solid var(--color-border)', borderRadius: '8px' }}>
                 <div style={{ fontSize: '0.8rem', color: 'var(--color-text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Repository Path</div>
                 <div style={{ fontFamily: 'monospace', fontSize: '0.9rem' }}>{inspectContainer.repository_path}</div>

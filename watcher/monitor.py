@@ -1,5 +1,5 @@
 """
-RewindWatcher Monitoring Daemon.
+Sentinel Monitoring Daemon.
 
 Standalone foreground-blocking process that polls Docker for crashed
 containers every 10 minutes and triggers the post-mortem AI workflow.
@@ -30,7 +30,7 @@ import sys
 import signal
 from pathlib import Path
 
-# Ensure the project root is on sys.path so both bugrewind and watcher
+# Ensure the project root is on sys.path so both vectra and watcher
 # packages can be imported regardless of the working directory.
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
@@ -39,7 +39,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 import docker
 from docker.errors import NotFound as DockerNotFound, APIError as DockerAPIError
 
-from bugrewind.utils.db import (
+from vectra.utils.db import (
     get_monitoring_containers,
     update_container_status,
     save_container_diagnostics,
@@ -52,7 +52,7 @@ logging.basicConfig(
     format="%(asctime)s  %(name)-28s  %(levelname)-7s  %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
-logger = logging.getLogger("rewindwatcher")
+logger = logging.getLogger("sentinel")
 
 # ── Configuration ──────────────────────────────────────────────────────────
 POLL_INTERVAL_SECONDS = 10 * 60  # 10 minutes
@@ -204,7 +204,7 @@ async def _run_loop() -> None:
     crash the loop.
     """
     logger.info("=" * 60)
-    logger.info("  RewindWatcher Monitoring Daemon Started")
+    logger.info("  Sentinel Monitoring Daemon Started")
     logger.info("  Polling interval: %d seconds (%d minutes)",
                 POLL_INTERVAL_SECONDS, POLL_INTERVAL_SECONDS // 60)
     logger.info("=" * 60)
@@ -243,7 +243,7 @@ def main() -> None:
 
     # Handle Ctrl+C gracefully
     def _signal_handler(sig, frame):
-        logger.info("\n🛑 Shutting down RewindWatcher …")
+        logger.info("\n🛑 Shutting down Sentinel …")
         loop.stop()
         sys.exit(0)
 
@@ -252,7 +252,7 @@ def main() -> None:
     try:
         loop.run_until_complete(_run_loop())
     except KeyboardInterrupt:
-        logger.info("\n🛑 Shutting down RewindWatcher …")
+        logger.info("\n🛑 Shutting down Sentinel …")
     finally:
         loop.close()
 

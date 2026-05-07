@@ -1,5 +1,5 @@
 """
-BugRewind LangGraph Workflow.
+Vectra LangGraph Workflow.
 
 Defines the complete multi-agent workflow as a compiled LangGraph StateGraph:
 
@@ -27,11 +27,11 @@ import logging
 
 from langgraph.graph import StateGraph, START, END
 
-from bugrewind.graph.state import BugRewindState
-from bugrewind.agents.orchestrator import orchestrator_node
-from bugrewind.agents.critic import critic_node
-from bugrewind.agents.coder import coder_node, docker_gen_node
-from bugrewind.agents.solomon import (
+from vectra.graph.state import VectraState
+from vectra.agents.orchestrator import orchestrator_node
+from vectra.agents.critic import critic_node
+from vectra.agents.coder import coder_node, docker_gen_node
+from vectra.agents.solomon import (
     validation_node,
     solomon_node,
     vercel_setup_node,
@@ -47,7 +47,7 @@ MAX_BUILD_RETRIES = 2  # max times to retry build-fail → critic → coder loop
 # ── Routing functions ──────────────────────────────────────────────────────
 
 
-def should_continue_fixing(state: BugRewindState) -> str:
+def should_continue_fixing(state: VectraState) -> str:
     """Decide whether to loop back to the Critic or move on to deployment.
 
     Returns:
@@ -84,7 +84,7 @@ def should_continue_fixing(state: BugRewindState) -> str:
     return "critic"
 
 
-def should_deploy_docker_or_vercel(state: BugRewindState) -> str:
+def should_deploy_docker_or_vercel(state: VectraState) -> str:
     """Choose between Docker and Vercel deployment pipelines.
 
     Inspects ``state["deploy_target"]`` (set by ``run_workflow`` based on
@@ -104,7 +104,7 @@ def should_deploy_docker_or_vercel(state: BugRewindState) -> str:
     return "docker_gen"
 
 
-def should_deploy_or_retry(state: BugRewindState) -> str:
+def should_deploy_or_retry(state: VectraState) -> str:
     """After validation (docker build), decide next step.
 
     Returns:
@@ -138,12 +138,12 @@ def should_deploy_or_retry(state: BugRewindState) -> str:
 
 
 def build_workflow() -> StateGraph:
-    """Construct and compile the BugRewind LangGraph workflow.
+    """Construct and compile the Vectra LangGraph workflow.
 
     Returns:
         A compiled ``StateGraph`` ready to be invoked with an initial state dict.
     """
-    builder = StateGraph(BugRewindState)
+    builder = StateGraph(VectraState)
 
     # Register all nodes
     builder.add_node("orchestrator", orchestrator_node)
@@ -244,7 +244,7 @@ def run_workflow(
     deploy_prompt: str = "Deploy this project securely via Docker.",
     max_iterations: int = 3,
     deploy_target: str | None = None,
-) -> BugRewindState:
+) -> VectraState:
     """Build and invoke the workflow end-to-end.
 
     Args:
@@ -262,7 +262,7 @@ def run_workflow(
 
     workflow = build_workflow()
 
-    initial_state: BugRewindState = {
+    initial_state: VectraState = {
         "repo_path": repo_path,
         "deploy_prompt": deploy_prompt,
         "deploy_target": resolved_target,
@@ -285,11 +285,11 @@ def run_workflow(
         "vercel_deploy_url": "",
         "vercel_deploy_log": "",
         "vercel_status": "",
-        "logs": "[BugRewind] Workflow started.",
+        "logs": "[Vectra] Workflow started.",
         "summary": "",
     }
 
-    logger.info("🚀 Starting BugRewind workflow for %s", repo_path)
+    logger.info("🚀 Starting Vectra workflow for %s", repo_path)
     final_state = workflow.invoke(initial_state)
 
     final_status = (

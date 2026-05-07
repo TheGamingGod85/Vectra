@@ -1,12 +1,12 @@
 """
-BugRewind — CLI Entry Point.
+Vectra — CLI Entry Point.
 
-Provides a command-line interface to run the BugRewind multi-agent workflow
+Provides a command-line interface to run the Vectra multi-agent workflow
 without going through MCP.  Useful for development, testing, and direct
 invocation.
 
 Usage:
-    uv run python -m bugrewind.main <repo_path> [--prompt "..."] [--max-iter N]
+    uv run python -m vectra.main <repo_path> [--prompt "..."] [--max-iter N]
 """
 
 from __future__ import annotations
@@ -16,13 +16,13 @@ import logging
 import sys
 from pathlib import Path
 
-from bugrewind.graph.workflow import run_workflow
+from vectra.graph.workflow import run_workflow
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        prog="bugrewind",
-        description="BugRewind - AI-powered secure deployment system",
+        prog="vectra",
+        description="Vectra - AI-powered secure deployment system",
     )
     parser.add_argument(
         "repo_path",
@@ -65,7 +65,7 @@ def main() -> None:
         print(f"❌ Error: {repo} is not a valid directory.", file=sys.stderr)
         sys.exit(1)
 
-    print(f"\n🚀 BugRewind starting for: {repo}")
+    print(f"\n🚀 Vectra starting for: {repo}")
     print(f"   Prompt:         {args.prompt}")
     print(f"   Max iterations: {args.max_iter}")
     print(f"   Deploy target:  {args.target or 'auto-detect'}")

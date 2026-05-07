@@ -9,7 +9,7 @@ def print_header():
 
 def main():
     print_header()
-    print("How would you like to run BugRewind today?\n")
+    print("How would you like to run Vectra today?\n")
     print("  [1] GUI Dashboard (Interactive Web UI)")
     print("  [2] CLI Automation (Headless terminal scan)")
     print("  [3] MCP Server (Protocol for AI Assistants)")
@@ -19,7 +19,7 @@ def main():
     
     if choice == '1':
         print("\n🚀 Firing up the full dashboard...")
-        subprocess.run([sys.executable, "-m", "bugrewind.gui"])
+        subprocess.run([sys.executable, "-m", "vectra.gui"])
     
     elif choice == '2':
         print("\n💻 Selected Headless CLI.")
@@ -29,16 +29,16 @@ def main():
             sys.exit(1)
         prompt = input("Enter a deploy prompt (or press Enter for default): ").strip()
         
-        args = [sys.executable, "-m", "bugrewind.main", repo_path]
+        args = [sys.executable, "-m", "vectra.main", repo_path]
         if prompt:
             args.extend(["--prompt", prompt])
             
-        print(f"\n🚀 Running BugRewind on: {repo_path}")
+        print(f"\n🚀 Running Vectra on: {repo_path}")
         subprocess.run(args)
         
     elif choice == '3':
         print("\n🔌 Starting FastMCP Server... (listening for assistant connections on stdio)")
-        subprocess.run([sys.executable, "-m", "bugrewind.mcp_server"])
+        subprocess.run([sys.executable, "-m", "vectra.mcp_server"])
         
     elif choice == '4':
         print("Exiting.")

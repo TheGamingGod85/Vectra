@@ -1,7 +1,7 @@
 """
-BugRewind MCP Server.
+Vectra MCP Server.
 
-Exposes the entire BugRewind multi-agent workflow as a single MCP tool
+Exposes the entire Vectra multi-agent workflow as a single MCP tool
 using FastMCP.  Any MCP-compatible client (Claude Desktop, Gemini, etc.)
 can call ``orchestrator_tool`` to scan, fix, and deploy a local repo.
 """
@@ -16,7 +16,7 @@ import os
 os.environ["FASTMCP_LOG_LEVEL"] = "ERROR"
 
 from fastmcp import FastMCP
-from bugrewind.graph.workflow import run_workflow
+from vectra.graph.workflow import run_workflow
 
 # Configure logging to strictly use stderr
 logging.basicConfig(
@@ -27,12 +27,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Initialize FastMCP
-mcp = FastMCP(name="BugRewind")
+mcp = FastMCP(name="Vectra")
 
 
 @mcp.tool
 def orchestrator_tool(repo_path: str, deploy_prompt: str) -> str:
-    """Run the full BugRewind pipeline on a local repository.
+    """Run the full Vectra pipeline on a local repository.
 
     This tool:
     1. Initialises the LangGraph multi-agent workflow.
@@ -63,12 +63,12 @@ def orchestrator_tool(repo_path: str, deploy_prompt: str) -> str:
         return final_state.get("summary", "No summary generated.")
     except Exception as exc:
         logger.exception("Workflow failed")
-        return f"❌ BugRewind workflow failed:\n\n{exc}"
+        return f"❌ Vectra workflow failed:\n\n{exc}"
 
 
 def run_server() -> None:
-    """Entry point for ``bugrewind-mcp`` console script."""
-    logger.info("Starting BugRewind MCP server …")
+    """Entry point for ``vectra-mcp`` console script."""
+    logger.info("Starting Vectra MCP server …")
     mcp.run()
 
 

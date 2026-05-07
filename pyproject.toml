@@ -1,5 +1,5 @@
 [project]
-name = "bugrewind"
+name = "vectra"
 version = "0.1.0"
 description = "AI-powered secure deployment system using multi-agent orchestration"
 readme = "README.md"
@@ -20,8 +20,8 @@ dependencies = [
 ]
 
 [project.scripts]
-bugrewind = "bugrewind.main:main"
-bugrewind-mcp = "bugrewind.mcp_server:run_server"
+vectra = "vectra.main:main"
+vectra-mcp = "vectra.mcp_server:run_server"
 
 [build-system]
 requires = ["hatchling"]

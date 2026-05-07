@@ -1,7 +1,7 @@
-# BugRewind Dashboard Architecture
+# Vectra Dashboard Architecture
 
 ## Overview
-The BugRewind dashboard is a React/Vite single-page application that provides real-time monitoring and visualization of deployment workflows. It communicates with the FastAPI backend via WebSocket for live updates and REST API for initial data.
+The Vectra dashboard is a React/Vite single-page application that provides real-time monitoring and visualization of deployment workflows. It communicates with the FastAPI backend via WebSocket for live updates and REST API for initial data.
 
 ## Frontend Stack
 - **Framework**: React 18.2.0 with Vite 4.4.5
@@ -11,7 +11,7 @@ The BugRewind dashboard is a React/Vite single-page application that provides re
 
 ## Project Structure
 ```
-bugrewind/dashboard/
+vectra/dashboard/
 ├── index.html          # Entry HTML file
 ├── vite.config.js      # Vite configuration
 ├── package.json        # Dependencies and scripts
@@ -32,7 +32,7 @@ bugrewind/dashboard/
 - Displays markdown summaries from agents
 
 ### WatcherMetrics.jsx
-- Displays monitoring data from RewindWatcher
+- Displays monitoring data from Sentinel
 - Shows container health status
 - Visualizes crash statistics and diagnostics
 
@@ -72,10 +72,10 @@ npm run preview
 5. **Error Handling**: Graceful error states and loading indicators
 
 ## Integration Points
-- Connects to `bugrewind/dashboard_api.py` FastAPI backend
-- Uses `bugrewind/utils/llm.py` for LLM communication
-- Shares database with `bugrewind/utils/db.py` for watcher data
-- WebSocket events mirror `BugRewindState` updates from the workflow graph
+- Connects to `vectra/dashboard_api.py` FastAPI backend
+- Uses `vectra/utils/llm.py` for LLM communication
+- Shares database with `vectra/utils/db.py` for watcher data
+- WebSocket events mirror `VectraState` updates from the workflow graph
 
 ## Styling Guidelines
 - Use CSS modules for component-specific styles

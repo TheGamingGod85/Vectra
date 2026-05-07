@@ -1,1 +1,1 @@
-# bugrewind agents package
+# vectra agents package

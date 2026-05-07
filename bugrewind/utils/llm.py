@@ -1,5 +1,5 @@
 """
-BugRewind LLM Utility.
+Vectra LLM Utility.
 
 Provides a thin wrapper around the Ollama local API at
 http://localhost:11434/api/generate.  All agent nodes call

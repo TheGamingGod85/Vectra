@@ -24,16 +24,16 @@ import re
 import subprocess
 from pathlib import Path
 
-from bugrewind.graph.state import BugRewindState
-from bugrewind.utils.llm import call_ollama
-from bugrewind.utils.file_ops import apply_patch, build_codebase_text
+from vectra.graph.state import VectraState
+from vectra.utils.llm import call_ollama
+from vectra.utils.file_ops import apply_patch, build_codebase_text
 
 logger = logging.getLogger(__name__)
 
 # ── Prompt: Fix Issues ─────────────────────────────────────────────────────
 
 CODER_FIX_PROMPT = """\
-You are BugRewind's Coder Agent — a senior software engineer who writes SECURE code.
+You are Vectra's Coder Agent — a senior software engineer who writes SECURE code.
 
 You are given a list of security/quality issues found by the Critic, along with
 the relevant source files.  Your job is to produce MINIMAL, TARGETED patches
@@ -107,7 +107,7 @@ Output ONLY valid JSON inside a ```json block, nothing else. No prose.
 """
 
 DOCKERFILE_PROMPT_UV = """\
-You are BugRewind's Coder Agent.  Generate a minimal, production-ready
+You are Vectra's Coder Agent.  Generate a minimal, production-ready
 Dockerfile for a Python project that uses **uv** as its package manager.
 
 MANDATORY RULES for uv-based Dockerfiles:
@@ -135,7 +135,7 @@ Output ONLY the Dockerfile content, no markdown fences, no explanation.
 """
 
 DOCKERFILE_PROMPT_PIP = """\
-You are BugRewind's Coder Agent.  Generate a minimal, production-ready
+You are Vectra's Coder Agent.  Generate a minimal, production-ready
 Dockerfile for a Python project that uses **pip** / requirements.txt.
 
 Requirements:
@@ -164,7 +164,7 @@ Generate a .dockerignore file for a project with these files:
 {file_list}
 
 Include standard ignores (.git, __pycache__, node_modules, .env, venv, .venv,
-.bugrewind_backup, *.pyc, .mypy_cache, .pytest_cache, etc.)
+.vectra_backup, *.pyc, .mypy_cache, .pytest_cache, etc.)
 and anything else that should not be in a Docker image.
 
 CRITICAL: DO NOT add pyproject.toml, uv.lock, requirements.txt, or any dependency definition file to .dockerignore!
@@ -254,7 +254,7 @@ def _generate_fallback_dockerfile_uv(
     return "\n".join(lines)
 
 
-def docker_gen_node(state: BugRewindState) -> dict:
+def docker_gen_node(state: VectraState) -> dict:
     """LangGraph node: Docker Generation.
 
     Generates Dockerfile and .dockerignore if they don't already exist in the
@@ -369,7 +369,7 @@ def docker_gen_node(state: BugRewindState) -> dict:
             dockerignore = dockerignore[: -len("```")].strip()
 
         # Ensure critical entries are present
-        must_have = {".env", ".venv", "venv", "__pycache__", ".git", ".bugrewind_backup"}
+        must_have = {".env", ".venv", "venv", "__pycache__", ".git", ".vectra_backup"}
         existing_lines = set(dockerignore.splitlines())
         
         # Strip out critically required files that should NOT be in .dockerignore
@@ -790,7 +790,7 @@ def _install_dependencies(
     return installed, log_text
 
 
-def coder_node(state: BugRewindState) -> dict:
+def coder_node(state: VectraState) -> dict:
     """LangGraph node: Coder.
 
     Reads critic issues, generates patches, validates them, writes to disk,

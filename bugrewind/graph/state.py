@@ -1,5 +1,5 @@
 """
-BugRewind Graph State Definition.
+Vectra Graph State Definition.
 
 Defines the central TypedDict state object that flows through every node
 in the LangGraph workflow. Every agent reads from and writes to this
@@ -12,7 +12,7 @@ import operator
 from typing import Annotated, TypedDict
 
 
-class BugRewindState(TypedDict):
+class VectraState(TypedDict):
     """Shared state that travels through the entire LangGraph workflow.
 
     Attributes:

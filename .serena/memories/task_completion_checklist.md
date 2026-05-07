@@ -1,4 +1,4 @@
-# BugRewind Task Completion Checklist
+# Vectra Task Completion Checklist
 
 ## Before Completing a Task
 
@@ -21,7 +21,7 @@
 
 ### Integration
 - [ ] New agents are added to the workflow graph
-- [ ] State fields are properly defined in `BugRewindState`
+- [ ] State fields are properly defined in `VectraState`
 - [ ] Reducers are used for accumulated fields (issues, patches)
 - [ ] File operations use utility functions from `file_ops.py`
 - [ ] Backup creation is tested before modifications
@@ -58,7 +58,7 @@
 
 2. **Run the main entry point**:
    ```bash
-   uv run python -m bugrewind.main /path/to/test/repo --prompt "test"
+   uv run python -m vectra.main /path/to/test/repo --prompt "test"
    ```
 
 3. **Check for errors**:
@@ -79,7 +79,7 @@
    - Verify Dockerfile and .dockerignore
 
 6. **Test Dashboard** (if applicable):
-   - Start GUI: `uv run python -m bugrewind.gui`
+   - Start GUI: `uv run python -m vectra.gui`
    - Verify backend is running on http://localhost:8000
    - Verify frontend is running on http://localhost:3000
    - Test WebSocket connection
@@ -87,7 +87,7 @@
    - Check markdown rendering in dashboard
 
 7. **Test MCP Server** (if applicable):
-   - Start MCP server: `uv run python -m bugrewind.mcp_server`
+   - Start MCP server: `uv run python -m vectra.mcp_server`
    - Connect from MCP client (Claude Desktop, etc.)
    - Test `orchestrator_tool` function
    - Verify markdown summary is returned
@@ -180,7 +180,7 @@ If you encounter:
 - [ ] Tool is imported and used correctly
 
 ### For State Changes
-- [ ] New fields added to `BugRewindState`
+- [ ] New fields added to `VectraState`
 - [ ] Field types are appropriate
 - [ ] Reducers used for accumulated fields
 - [ ] Default values are sensible

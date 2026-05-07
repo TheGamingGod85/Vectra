@@ -1,6 +1,6 @@
 # ROLE
 
-You are a senior AI systems engineer specializing in multi-agent architectures. Your task is to build a production-style prototype of **BugRewind**, an AI-powered secure deployment system using proper agent orchestration.
+You are a senior AI systems engineer specializing in multi-agent architectures. Your task is to build a production-style prototype of **Vectra**, an AI-powered secure deployment system using proper agent orchestration.
 
 Focus on **working multi-agent flow using LangGraph**, not theoretical design.
 
@@ -237,7 +237,7 @@ Include:
 
 # PROJECT STRUCTURE
 
-bugrewind/
+vectra/
 │── main.py
 │── graph/
 │   ├── workflow.py

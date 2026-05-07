@@ -1,7 +1,7 @@
 """
 Orchestrator Agent – LangGraph Node.
 
-Entry point of the BugRewind workflow.  Responsibilities:
+Entry point of the Vectra workflow.  Responsibilities:
 
 1. Read and understand the target repository.
 2. Create a backup of the original codebase before any changes.
@@ -13,14 +13,14 @@ from __future__ import annotations
 
 import logging
 
-from bugrewind.graph.state import BugRewindState
-from bugrewind.utils.file_ops import read_repo, build_codebase_text, create_backup
-from bugrewind.utils.llm import call_ollama
+from vectra.graph.state import VectraState
+from vectra.utils.file_ops import read_repo, build_codebase_text, create_backup
+from vectra.utils.llm import call_ollama
 
 logger = logging.getLogger(__name__)
 
 ORCHESTRATOR_PROMPT = """\
-You are BugRewind's Orchestrator Agent — a senior DevSecOps architect.
+You are Vectra's Orchestrator Agent — a senior DevSecOps architect.
 
 You have been given the full source code of a repository, a deployment request
 from the user, and a deployment target.  Your job is to:
@@ -52,7 +52,7 @@ Be concise.  Output ONLY the plan, no preamble.
 """
 
 
-def orchestrator_node(state: BugRewindState) -> dict:
+def orchestrator_node(state: VectraState) -> dict:
     """LangGraph node: Orchestrator.
 
     Reads the repo, creates a backup, builds the codebase context, calls the

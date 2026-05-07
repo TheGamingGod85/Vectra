@@ -1,5 +1,5 @@
 """
-RewindWatcher State Definition.
+Sentinel State Definition.
 
 Defines the ``WatcherState`` TypedDict that flows through the
 post-mortem LangGraph workflow.  Each field captures a facet of
@@ -13,7 +13,7 @@ from typing import TypedDict
 
 
 class WatcherState(TypedDict):
-    """Shared state for the RewindWatcher post-mortem workflow.
+    """Shared state for the Sentinel post-mortem workflow.
 
     Attributes:
         container_id:         Docker container ID or name.

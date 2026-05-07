@@ -1,5 +1,5 @@
 """
-BugRewind File Operations Utility.
+Vectra File Operations Utility.
 
 Handles reading an entire repository into a structured manifest,
 writing patches back to disk, creating pre-patch backups, and
@@ -73,7 +73,7 @@ def read_repo(repo_path: str) -> dict[str, str]:
         dirnames[:] = [
             d for d in dirnames
             if d not in SKIP_DIRS and not d.endswith(".egg-info")
-            and d != ".bugrewind_backup"  # Skip our own backup dirs
+            and d != ".vectra_backup"  # Skip our own backup dirs
         ]
 
         for fname in filenames:
@@ -131,7 +131,7 @@ def create_backup(repo_path: str, file_manifest: dict[str, str]) -> str:
     """Create a timestamped backup of all source files before patching.
 
     Copies each file from ``file_manifest`` into a
-    ``<repo>/.bugrewind_backup/<timestamp>/`` directory, preserving the
+    ``<repo>/.vectra_backup/<timestamp>/`` directory, preserving the
     relative directory structure.
 
     This is called ONCE before the first patch is applied, and skipped
@@ -148,7 +148,7 @@ def create_backup(repo_path: str, file_manifest: dict[str, str]) -> str:
 
     # Only create one backup per repo per process run
     if resolved in _backup_created_for:
-        backup_dir = Path(resolved) / ".bugrewind_backup"
+        backup_dir = Path(resolved) / ".vectra_backup"
         # Return the most recent subdirectory
         existing = sorted(backup_dir.iterdir()) if backup_dir.exists() else []
         if existing:
@@ -156,7 +156,7 @@ def create_backup(repo_path: str, file_manifest: dict[str, str]) -> str:
         # Shouldn't happen, but fall through to create
 
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_dir = Path(repo_path) / ".bugrewind_backup" / timestamp
+    backup_dir = Path(repo_path) / ".vectra_backup" / timestamp
     backup_dir.mkdir(parents=True, exist_ok=True)
 
     copied = 0
@@ -193,13 +193,13 @@ def apply_patch(repo_path: str, file_path: str, new_content: str) -> None:
 
 
 def write_summary(repo_path: str, summary_md: str) -> str:
-    """Write the final summary markdown to both the BugRewind ``outputs/``
+    """Write the final summary markdown to both the Vectra ``outputs/``
     directory AND the target repository root.
 
     Returns:
         Absolute path to the summary file inside the target repository.
     """
-    # ── Write to BugRewind's own outputs directory ────────────────────────
+    # ── Write to Vectra's own outputs directory ────────────────────────
     out_dir = Path(__file__).resolve().parent.parent / "outputs"
     out_dir.mkdir(parents=True, exist_ok=True)
     internal_path = out_dir / "summary.md"

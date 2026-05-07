@@ -1,4 +1,4 @@
-# BugRewind
+# Vectra
 
 AI-powered secure deployment system using multi-agent orchestration.
 
@@ -9,10 +9,10 @@ AI-powered secure deployment system using multi-agent orchestration.
 uv sync
 
 # Run against a target repo
-uv run python -m bugrewind.main /path/to/repo --prompt "Deploy securely"
+uv run python -m vectra.main /path/to/repo --prompt "Deploy securely"
 
 # Run as MCP server
-uv run python -m bugrewind.mcp_server
+uv run python -m vectra.mcp_server
 ```
 
 ## Prerequisites
@@ -31,9 +31,9 @@ START → Orchestrator → Critic → Coder → Critic (loop)
       → Docker Gen → Validation → Solomon → Summary → END
 ```
 
-## RewindWatcher (Background Monitoring)
+## Sentinel (Background Monitoring)
 
-RewindWatcher is a standalone background daemon that monitors containers deployed by BugRewind. If a container crashes, it automatically triggers a post-mortem AI diagnostics workflow.
+Sentinel is a standalone background daemon that monitors containers deployed by Vectra. If a container crashes, it automatically triggers a post-mortem AI diagnostics workflow.
 
 ### Start Monitoring
 ```bash

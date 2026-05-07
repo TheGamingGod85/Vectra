@@ -1,5 +1,5 @@
 """
-BugRewind Docker Tools.
+Vectra Docker Tools.
 
 Provides ``docker_build`` and ``docker_run`` helpers that shell out to the
 Docker CLI via ``subprocess``.  Only the Solomon agent should invoke these.
@@ -18,7 +18,7 @@ DOCKER_TIMEOUT = 300  # seconds
 
 def docker_build(
     context_path: str,
-    tag: str = "bugrewind-app:latest",
+    tag: str = "vectra-app:latest",
 ) -> tuple[bool, str]:
     """Run ``docker build`` on the given context directory.
 
@@ -61,8 +61,8 @@ def docker_build(
 
 
 def docker_run(
-    tag: str = "bugrewind-app:latest",
-    container_name: str = "bugrewind-container",
+    tag: str = "vectra-app:latest",
+    container_name: str = "vectra-container",
     ports: str | None = None,
     detach: bool = True,
     health_check_seconds: int = 5,
@@ -149,7 +149,7 @@ def docker_run(
         return False, msg
 
 
-def docker_stop(container_name: str = "bugrewind-container") -> tuple[bool, str]:
+def docker_stop(container_name: str = "vectra-container") -> tuple[bool, str]:
     """Stop and remove a running container.
 
     Returns:

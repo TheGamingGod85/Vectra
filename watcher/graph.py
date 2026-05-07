@@ -1,8 +1,8 @@
 """
-RewindWatcher Post-Mortem LangGraph Workflow.
+Sentinel Post-Mortem LangGraph Workflow.
 
 Defines a three-node workflow that operates entirely independently
-of BugRewind's main deployment graph:
+of Vectra's main deployment graph:
 
     PM Critic → PM Coder → Dispatcher
 
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 def build_watcher_graph() -> StateGraph:
-    """Build and compile the RewindWatcher post-mortem LangGraph workflow.
+    """Build and compile the Sentinel post-mortem LangGraph workflow.
 
     Returns:
         A compiled ``StateGraph`` ready to be invoked with a ``WatcherState``.
@@ -43,7 +43,7 @@ def build_watcher_graph() -> StateGraph:
     graph.add_edge("pm_coder", "dispatcher")
     graph.add_edge("dispatcher", END)
 
-    logger.info("RewindWatcher graph compiled: pm_critic → pm_coder → dispatcher")
+    logger.info("Sentinel graph compiled: pm_critic → pm_coder → dispatcher")
     return graph.compile()
 
 

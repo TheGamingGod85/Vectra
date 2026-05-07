@@ -21,8 +21,8 @@ import json
 import logging
 import re
 
-from bugrewind.graph.state import BugRewindState
-from bugrewind.utils.llm import call_ollama
+from vectra.graph.state import VectraState
+from vectra.utils.llm import call_ollama
 
 logger = logging.getLogger(__name__)
 
@@ -184,7 +184,7 @@ def _static_prescan(file_manifest: dict[str, str]) -> list[dict]:
 
 
 CRITIC_PROMPT = """\
-You are BugRewind's Critic Agent — a ruthless, thorough application security auditor and code optimizer.
+You are Vectra's Critic Agent — a ruthless, thorough application security auditor and code optimizer.
 
 You are given:
 1. The execution plan from the Orchestrator.
@@ -315,7 +315,7 @@ def _deduplicate_issues(
     return merged
 
 
-def critic_node(state: BugRewindState) -> dict:
+def critic_node(state: VectraState) -> dict:
     """LangGraph node: Critic.
 
     Analyses the codebase using a two-phase approach:

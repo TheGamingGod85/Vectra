@@ -1,6 +1,6 @@
-# BugRewind Suggested Commands
+# Vectra Suggested Commands
 
-## BugRewind (Deployment Service)
+## Vectra (Deployment Service)
 
 ### Install Dependencies
 ```bash
@@ -14,17 +14,17 @@ uv run python start.py
 
 ### CLI Deployment
 ```bash
-uv run python -m bugrewind.main /path/to/repo --prompt "Deploy securely"
+uv run python -m vectra.main /path/to/repo --prompt "Deploy securely"
 ```
 
 ### GUI Dashboard
 ```bash
-uv run python -m bugrewind.gui
+uv run python -m vectra.gui
 ```
 
 ### MCP Server
 ```bash
-uv run python -m bugrewind.mcp_server
+uv run python -m vectra.mcp_server
 ```
 
 ## Prompt Files
@@ -34,11 +34,11 @@ uv run python -m bugrewind.mcp_server
 # Main system prompt
 cat .prompts/PROMPT.md
 
-# RewindWatcher specification
+# Sentinel specification
 cat .prompts/REWINDPROMPT.md
 ```
 
-## RewindWatcher (Monitoring Service)
+## Sentinel (Monitoring Service)
 
 ### Start Monitoring Daemon
 ```bash
@@ -69,7 +69,7 @@ sqlite3 monitored_containers.sqlite "SELECT * FROM containers;"
 
 ### List Active Monitored Containers
 ```bash
-docker ps --filter "name=bugrewind-container"
+docker ps --filter "name=vectra-container"
 ```
 
 ### View Watcher Logs
