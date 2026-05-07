@@ -47,7 +47,7 @@ vectra/dashboard/
 - **REST Endpoints**: 
   - `GET /api/state` - Get current workflow state
   - `POST /api/trigger` - Trigger new deployment workflow
-  - `GET /api/watcher/metrics` - Get watcher monitoring data
+  - `GET /api/sentinel/metrics` - Get sentinel monitoring data
 
 ## Development Commands
 ```bash
@@ -74,7 +74,7 @@ npm run preview
 ## Integration Points
 - Connects to `vectra/dashboard_api.py` FastAPI backend
 - Uses `vectra/utils/llm.py` for LLM communication
-- Shares database with `vectra/utils/db.py` for watcher data
+- Shares database with `vectra/utils/db.py` for sentinel data
 - WebSocket events mirror `VectraState` updates from the workflow graph
 
 ## Styling Guidelines

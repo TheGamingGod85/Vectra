@@ -15,7 +15,7 @@ from pathlib import Path
 from vectra.utils.llm import call_ollama
 from vectra.utils.file_ops import read_repo, build_codebase_text
 
-from watcher.state import WatcherState
+from sentinel.state import WatcherState
 
 logger = logging.getLogger(__name__)
 

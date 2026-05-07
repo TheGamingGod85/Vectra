@@ -196,9 +196,9 @@ def serialize_state(state: Dict[str, Any]) -> Dict[str, Any]:
     # We'll just return it as is for now as pydantic handles it usually.
     return state
 
-@app.get("/api/watcher/containers")
-async def get_watcher_containers():
-    """Retrieve all monitored containers and watcher statistics."""
+@app.get("/api/sentinel/containers")
+async def get_sentinel_containers():
+    """Retrieve all monitored containers and sentinel statistics."""
     from vectra.utils.db import get_all_containers
     try:
         containers = get_all_containers()
@@ -225,8 +225,8 @@ async def get_watcher_containers():
         logger.error(f"Error fetching containers: {e}")
         return {"containers": [], "metrics": {}}
 
-@app.delete("/api/watcher/containers/{container_id}")
-async def delete_watcher_container(container_id: str):
+@app.delete("/api/sentinel/containers/{container_id}")
+async def delete_sentinel_container(container_id: str):
     """Delete a monitored container entry."""
     from vectra.utils.db import delete_container
     try:
@@ -236,8 +236,8 @@ async def delete_watcher_container(container_id: str):
         logger.error(f"Error deleting container: {e}")
         return {"status": "error", "message": str(e)}
 
-@app.post("/api/watcher/containers/{container_id}/start")
-async def start_watcher_container(container_id: str):
+@app.post("/api/sentinel/containers/{container_id}/start")
+async def start_sentinel_container(container_id: str):
     """Start a docker container by its docker container_id."""
     import docker
     from vectra.utils.db import _get_connection
@@ -247,7 +247,7 @@ async def start_watcher_container(container_id: str):
         container = client.containers.get(container_id)
         container.start()
         
-        # Reset status back to 'monitoring' so the watcher daemon picks it up again
+        # Reset status back to 'monitoring' so the sentinel daemon picks it up again
         conn = _get_connection()
         conn.execute("UPDATE containers SET status = 'monitoring' WHERE container_id = ?", (container_id,))
         conn.commit()

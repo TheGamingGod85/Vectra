@@ -33,11 +33,11 @@ In `vectra/agents/solomon.py`, locate the `solomon_node` or `validation_node` wh
 
 ---
 
-## 2. Sentinel Architecture (`watcher/`)
+## 2. Sentinel Architecture (`sentinel/`)
 
-Create a new directory named `watcher` at the project root. This service must run in its own Python process.
+Create a new directory named `sentinel` at the project root. This service must run in its own Python process.
 
-### 2.1 The Polling Loop (`watcher/monitor.py`)
+### 2.1 The Polling Loop (`sentinel/monitor.py`)
 Implement the core monitoring loop using `apscheduler` (BackgroundScheduler) or a standard `asyncio` while-loop. 
 - **Frequency**: Run the check every 10 minutes.
 - **Action**: Query the database for all records where `status = 'monitoring'`.
@@ -55,7 +55,7 @@ When an `exited` container is found, execute a forensics script to collect the s
 
 ## 3. Post-Mortem AI Workflow (LangGraph)
 
-Create `watcher/graph.py` and `watcher/agents.py`. This workflow operates entirely independently of Vectra's main deployment graph.
+Create `sentinel/graph.py` and `sentinel/agents.py`. This workflow operates entirely independently of Vectra's main deployment graph.
 
 ### 3.1 Watcher State (`WatcherState` TypedDict)
 ```python
@@ -88,7 +88,7 @@ class WatcherState(TypedDict):
 
 ---
 
-## 4. Intelligent Notification Dispatch (`watcher/notifier.py`)
+## 4. Intelligent Notification Dispatch (`sentinel/notifier.py`)
 
 Create a terminal/mock mailer that routes the workflow's conclusions to the appropriate parties based on the `root_cause_category`.
 
@@ -110,6 +110,6 @@ For both cases below, the **Recipient** is the `target_email`:
 ---
 
 ## 5. Execution & Tooling Requirements
-- **LLM Consistency**: The watcher must utilize the exact same Ollama / LLM abstraction layer found in `vectra.utils.llm` to ensure model consistency.
-- **Isolation**: Running `python watcher/monitor.py` should start a foreground blocking process that handles the scheduling and AI execution without requiring `uvicorn` or any web dependencies. 
-- **Graceful Failure**: If the LLM is down or times out during Post-Mortem Analysis, log the timeout to the console but do not crash the watcher loop. Try the analysis again on the next polling cycle.
+- **LLM Consistency**: The sentinel must utilize the exact same Ollama / LLM abstraction layer found in `vectra.utils.llm` to ensure model consistency.
+- **Isolation**: Running `python sentinel/monitor.py` should start a foreground blocking process that handles the scheduling and AI execution without requiring `uvicorn` or any web dependencies. 
+- **Graceful Failure**: If the LLM is down or times out during Post-Mortem Analysis, log the timeout to the console but do not crash the sentinel loop. Try the analysis again on the next polling cycle.

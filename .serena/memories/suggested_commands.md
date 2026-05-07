@@ -42,7 +42,7 @@ cat .prompts/REWINDPROMPT.md
 
 ### Start Monitoring Daemon
 ```bash
-uv run python watcher/monitor.py
+uv run python sentinel/monitor.py
 ```
 
 ### SMTP Configuration (Required for Email Alerts)
@@ -73,7 +73,7 @@ docker ps --filter "name=vectra-container"
 ```
 
 ### View Watcher Logs
-Watcher logs are printed directly to the console during `python watcher/monitor.py` execution.
+Watcher logs are printed directly to the console during `python sentinel/monitor.py` execution.
 
 ### Clean Docker Environment
 ```bash

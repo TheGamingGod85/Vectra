@@ -11,11 +11,11 @@ export default function WatcherMetrics() {
   const fetchMetrics = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/watcher/containers');
+      const res = await fetch('http://localhost:8000/api/sentinel/containers');
       const json = await res.json();
       setData(json);
     } catch (err) {
-      console.error("Failed to fetch watcher metrics", err);
+      console.error("Failed to fetch sentinel metrics", err);
     } finally {
       setLoading(false);
     }
@@ -30,7 +30,7 @@ export default function WatcherMetrics() {
   const deleteContainer = async (id) => {
     if (!window.confirm("Are you sure you want to delete this container?")) return;
     try {
-      await fetch(`http://localhost:8000/api/watcher/containers/${id}`, {
+      await fetch(`http://localhost:8000/api/sentinel/containers/${id}`, {
         method: 'DELETE',
       });
       fetchMetrics();
@@ -41,7 +41,7 @@ export default function WatcherMetrics() {
 
   const startContainer = async (container_id) => {
     try {
-      await fetch(`http://localhost:8000/api/watcher/containers/${container_id}/start`, {
+      await fetch(`http://localhost:8000/api/sentinel/containers/${container_id}/start`, {
         method: 'POST',
       });
       fetchMetrics();
@@ -63,7 +63,7 @@ export default function WatcherMetrics() {
   const { metrics, containers } = data;
 
   return (
-    <div className="watcher-container" style={{ display: 'flex', flexDirection: 'column', gap: '24px', height: '100%' }}>
+    <div className="sentinel-container" style={{ display: 'flex', flexDirection: 'column', gap: '24px', height: '100%' }}>
       {/* Metrics Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
         <MetricCard icon={<Server />} label="Total Deployments" value={metrics.totalDeployments || 0} color="var(--color-accent)" />

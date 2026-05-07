@@ -25,7 +25,7 @@ The main workflow for securing and deploying applications.
 - **Coder Agent**: Applies patches and generates Docker/Vercel configs.
 - **Solomon Agent**: Execution engine (Docker/Vercel builds and runs). Now includes a hook to register successful deployments in the monitoring database.
 
-### 2. Sentinel Monitoring Service (`watcher/`)
+### 2. Sentinel Monitoring Service (`sentinel/`)
 A standalone background daemon for post-mortem diagnostics.
 - **monitor.py**: Polling loop (10-min interval) that tracks container health via Docker SDK.
 - **Forensics Workflow**: Triggered upon crash detection.
@@ -50,7 +50,7 @@ vectra/
 └── utils/               # File Ops, LLM, and DB utility
     ├── db.py            # SQLite management for monitoring
 
-watcher/                 # Sentinel service
+sentinel/                 # Sentinel service
 ├── monitor.py           # Daemon entry point
 ├── graph.py             # Forensics workflow definition
 ├── agents.py            # Post-mortem analysis nodes
@@ -74,5 +74,5 @@ monitored_containers.sqlite # Database tracking active containers
 ## Entry Points
 1. **Interactive Launcher**: `start.py`
 2. **Vectra CLI**: `uv run python -m vectra.main`
-3. **Sentinel**: `uv run python watcher/monitor.py`
+3. **Sentinel**: `uv run python sentinel/monitor.py`
 4. **MCP Server**: `vectra-mcp`

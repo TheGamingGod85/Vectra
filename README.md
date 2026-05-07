@@ -38,7 +38,7 @@ Sentinel is a standalone background daemon that monitors containers deployed by 
 ### Start Monitoring
 ```bash
 # Run the monitoring daemon
-python watcher/monitor.py
+python sentinel/monitor.py
 ```
 
 ### Features

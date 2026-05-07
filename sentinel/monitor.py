@@ -6,7 +6,7 @@ containers every 10 minutes and triggers the post-mortem AI workflow.
 
 Usage::
 
-    python watcher/monitor.py
+    python sentinel/monitor.py
 
 The daemon:
 1. Reads the ``monitored_containers.sqlite`` database for containers
@@ -18,7 +18,7 @@ The daemon:
 5. Updates the database status to ``'notified'`` upon completion.
 
 Graceful failure: if the LLM is down or times out, the error is logged
-but the watcher loop continues — the container will be retried on the
+but the sentinel loop continues — the container will be retried on the
 next polling cycle.
 """
 
@@ -30,7 +30,7 @@ import sys
 import signal
 from pathlib import Path
 
-# Ensure the project root is on sys.path so both vectra and watcher
+# Ensure the project root is on sys.path so both vectra and sentinel
 # packages can be imported regardless of the working directory.
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
@@ -44,7 +44,7 @@ from vectra.utils.db import (
     update_container_status,
     save_container_diagnostics,
 )
-from watcher.graph import run_watcher_workflow
+from sentinel.graph import run_sentinel_workflow
 
 # ── Logging setup ──────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -173,7 +173,7 @@ def poll_once(client: docker.DockerClient) -> int:
             continue
 
         try:
-            result = run_watcher_workflow(
+            result = run_sentinel_workflow(
                 container_id=container_id,
                 repo_path=repo_path,
                 exit_code=forensics["exit_code"],
@@ -238,7 +238,7 @@ async def _run_loop() -> None:
 
 
 def main() -> None:
-    """Entry point for ``python watcher/monitor.py``."""
+    """Entry point for ``python sentinel/monitor.py``."""
     loop = asyncio.new_event_loop()
 
     # Handle Ctrl+C gracefully

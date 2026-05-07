@@ -17,14 +17,14 @@ import logging
 
 from langgraph.graph import StateGraph, END
 
-from watcher.state import WatcherState
-from watcher.agents import pm_critic_node, pm_coder_node
-from watcher.notifier import dispatcher_node
+from sentinel.state import WatcherState
+from sentinel.agents import pm_critic_node, pm_coder_node
+from sentinel.notifier import dispatcher_node
 
 logger = logging.getLogger(__name__)
 
 
-def build_watcher_graph() -> StateGraph:
+def build_sentinel_graph() -> StateGraph:
     """Build and compile the Sentinel post-mortem LangGraph workflow.
 
     Returns:
@@ -47,7 +47,7 @@ def build_watcher_graph() -> StateGraph:
     return graph.compile()
 
 
-def run_watcher_workflow(
+def run_sentinel_workflow(
     container_id: str,
     repo_path: str,
     exit_code: int,
@@ -68,7 +68,7 @@ def run_watcher_workflow(
     Returns:
         The final state dict after all nodes have run.
     """
-    compiled_graph = build_watcher_graph()
+    compiled_graph = build_sentinel_graph()
 
     initial_state: WatcherState = {
         "container_id": container_id,

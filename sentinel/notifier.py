@@ -21,7 +21,7 @@ from email.mime.text import MIMEText
 
 import markdown
 
-from watcher.state import WatcherState
+from sentinel.state import WatcherState
 
 logger = logging.getLogger(__name__)
 
