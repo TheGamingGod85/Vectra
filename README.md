@@ -2,6 +2,8 @@
 
 AI-powered secure deployment system using multi-agent orchestration.
 
+[Some Videos](https://youtube.com/playlist?list=PL1_dtHw-VrownpmumDZUEC2OPxwF5YXEu&si=MghRaCARJn98uOmC)
+
 ## Quick Start
 
 ```bash
