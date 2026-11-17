@@ -16,11 +16,11 @@ import logging
 import time
 import httpx
 
+from vectra.config import OLLAMA_URL, DEFAULT_MODEL, LLM_TIMEOUT
+
 logger = logging.getLogger(__name__)
 
-OLLAMA_URL = "http://172.16.17.61:11434/api/generate"
-DEFAULT_MODEL = "kimi-k2.5:cloud"
-REQUEST_TIMEOUT = 500.0  # seconds – local LLMs can be slow
+REQUEST_TIMEOUT = LLM_TIMEOUT  # seconds – local LLMs can be slow
 
 # Retry configuration
 MAX_RETRIES = 3

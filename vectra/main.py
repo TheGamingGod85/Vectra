@@ -50,6 +50,11 @@ def main() -> None:
         default=None,
         help="Deployment target (docker or vercel). Auto-detected from prompt if omitted.",
     )
+    parser.add_argument(
+        "--email",
+        default="",
+        help="Recipient for Sentinel crash alerts (falls back to VECTRA_TARGET_EMAIL).",
+    )
 
     args = parser.parse_args()
 
@@ -77,6 +82,7 @@ def main() -> None:
         deploy_prompt=args.prompt,
         max_iterations=args.max_iter,
         deploy_target=args.target,
+        target_email=args.email,
     )
 
     # ── Print the summary ──────────────────────────────────────────────

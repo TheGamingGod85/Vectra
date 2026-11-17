@@ -244,6 +244,7 @@ def run_workflow(
     deploy_prompt: str = "Deploy this project securely via Docker.",
     max_iterations: int = 3,
     deploy_target: str | None = None,
+    target_email: str = "",
 ) -> VectraState:
     """Build and invoke the workflow end-to-end.
 
@@ -253,6 +254,8 @@ def run_workflow(
         max_iterations: Max Critic↔Coder loop iterations.
         deploy_target:  Explicit target (``"docker"`` or ``"vercel"``).
                         If ``None``, auto-detected from ``deploy_prompt``.
+        target_email:   Recipient for Sentinel crash alerts.  Empty →
+                        falls back to the VECTRA_TARGET_EMAIL env var.
 
     Returns:
         The final state dict after the workflow completes.
@@ -266,6 +269,7 @@ def run_workflow(
         "repo_path": repo_path,
         "deploy_prompt": deploy_prompt,
         "deploy_target": resolved_target,
+        "target_email": target_email,
         "codebase": "",
         "file_manifest": {},
         "plan": "",

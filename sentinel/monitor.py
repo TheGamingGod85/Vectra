@@ -24,10 +24,9 @@ next polling cycle.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import sys
-import signal
+import time
 from pathlib import Path
 
 # Ensure the project root is on sys.path so both vectra and sentinel
@@ -39,6 +38,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 import docker
 from docker.errors import NotFound as DockerNotFound, APIError as DockerAPIError
 
+from vectra.config import POLL_INTERVAL_SECONDS
 from vectra.utils.db import (
     get_monitoring_containers,
     update_container_status,
@@ -53,9 +53,6 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger("sentinel")
-
-# ── Configuration ──────────────────────────────────────────────────────────
-POLL_INTERVAL_SECONDS = 10 * 60  # 10 minutes
 
 
 def _extract_forensics(client: docker.DockerClient, container_id: str) -> dict | None:
@@ -196,12 +193,12 @@ def poll_once(client: docker.DockerClient) -> int:
     return analysed
 
 
-async def _run_loop() -> None:
-    """Async polling loop that runs indefinitely.
+def _run_loop() -> None:
+    """Polling loop that runs indefinitely.
 
-    Polls every ``POLL_INTERVAL_SECONDS`` (default 10 minutes).
-    Graceful failure: any LLM or Docker error is logged but does NOT
-    crash the loop.
+    Polls every ``POLL_INTERVAL_SECONDS`` (VECTRA_POLL_INTERVAL_SECONDS,
+    default 10 minutes).  Graceful failure: any LLM or Docker error is
+    logged but does NOT crash the loop.
     """
     logger.info("=" * 60)
     logger.info("  Sentinel Monitoring Daemon Started")
@@ -234,27 +231,16 @@ async def _run_loop() -> None:
             "💤 Next poll in %d minutes. Press Ctrl+C to stop.",
             POLL_INTERVAL_SECONDS // 60,
         )
-        await asyncio.sleep(POLL_INTERVAL_SECONDS)
+        time.sleep(POLL_INTERVAL_SECONDS)
 
 
 def main() -> None:
     """Entry point for ``python sentinel/monitor.py``."""
-    loop = asyncio.new_event_loop()
-
-    # Handle Ctrl+C gracefully
-    def _signal_handler(sig, frame):
-        logger.info("\n🛑 Shutting down Sentinel …")
-        loop.stop()
-        sys.exit(0)
-
-    signal.signal(signal.SIGINT, _signal_handler)
-
     try:
-        loop.run_until_complete(_run_loop())
+        _run_loop()
     except KeyboardInterrupt:
         logger.info("\n🛑 Shutting down Sentinel …")
-    finally:
-        loop.close()
+        sys.exit(0)
 
 
 if __name__ == "__main__":

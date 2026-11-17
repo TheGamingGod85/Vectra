@@ -20,6 +20,8 @@ class VectraState(TypedDict):
         deploy_prompt:      Free-form user intent / deployment instructions.
         deploy_target:      Deployment backend — ``"docker"`` (default) or ``"vercel"``.
                             Determined automatically from the deploy_prompt.
+        target_email:       Recipient for Sentinel crash alerts.  Empty →
+                            falls back to VECTRA_TARGET_EMAIL (or console-only).
         codebase:           Concatenated source code text ingested from the repo.
         file_manifest:      Mapping of relative file path → file content for
                             targeted patching by the Coder agent.
@@ -54,6 +56,7 @@ class VectraState(TypedDict):
     repo_path: str
     deploy_prompt: str
     deploy_target: str
+    target_email: str
     codebase: str
     file_manifest: dict[str, str]
     plan: str

@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS containers (
 In `vectra/agents/solomon.py`, locate the `solomon_node` or `validation_node` where Docker `run` is executed successfully. Upon a successful run:
 1. Generate a UUID for the record.
 2. Insert a row into the database linking the `container_id` returned by Docker to the `state["repo_path"]`.
-3. Provide a default fallback email (e.g., `marcus32holloway@gmail.com`) if a real one is not present in the state.
+3. If no recipient email is present in the state, fall back to the `VECTRA_TARGET_EMAIL` environment variable; if that is also unset, Sentinel prints reports to the console instead of emailing.
 
 ---
 

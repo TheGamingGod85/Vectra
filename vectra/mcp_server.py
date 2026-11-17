@@ -31,7 +31,7 @@ mcp = FastMCP(name="Vectra")
 
 
 @mcp.tool
-def orchestrator_tool(repo_path: str, deploy_prompt: str) -> str:
+def orchestrator_tool(repo_path: str, deploy_prompt: str, target_email: str = "") -> str:
     """Run the full Vectra pipeline on a local repository.
 
     This tool:
@@ -47,6 +47,8 @@ def orchestrator_tool(repo_path: str, deploy_prompt: str) -> str:
         repo_path:     Absolute path to the target repository on disk.
         deploy_prompt: Free-form deployment instructions / user intent,
                        e.g. "Deploy this FastAPI app with security hardening".
+        target_email:  Optional recipient for Sentinel crash alerts
+                       (falls back to the VECTRA_TARGET_EMAIL env var).
 
     Returns:
         A markdown summary including issues found, patches applied,
@@ -59,6 +61,7 @@ def orchestrator_tool(repo_path: str, deploy_prompt: str) -> str:
             repo_path=repo_path,
             deploy_prompt=deploy_prompt,
             max_iterations=3,
+            target_email=target_email,
         )
         return final_state.get("summary", "No summary generated.")
     except Exception as exc:

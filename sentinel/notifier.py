@@ -14,20 +14,16 @@ Also implements dispatch routing logic based on `root_cause_category`:
 from __future__ import annotations
 
 import logging
-import os
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 import markdown
 
+from vectra.config import SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_APP_PASSWORD
 from sentinel.state import WatcherState
 
 logger = logging.getLogger(__name__)
-
-# ── SMTP Configuration ────────────────────────────────────────────────────
-SMTP_HOST = "smtp.gmail.com"
-SMTP_PORT = 587
 
 
 def _build_infrastructure_email(state: WatcherState) -> tuple[str, str]:
@@ -155,16 +151,22 @@ def send_email(
     Returns:
         ``True`` if the email was sent successfully, ``False`` otherwise.
     """
-    smtp_user = "marcus32holloway@gmail.com"
-    smtp_password = "oumecupwecximhal"
+    smtp_user = SMTP_USER
+    smtp_password = SMTP_APP_PASSWORD
 
-    if not smtp_user or not smtp_password:
-        logger.warning(
-            "SMTP credentials not configured (SMTP_USER / SMTP_APP_PASSWORD). "
-            "Printing email to console instead."
-        )
+    if not recipient or not smtp_user or not smtp_password:
+        if not recipient:
+            logger.warning(
+                "No alert recipient configured (VECTRA_TARGET_EMAIL / --email). "
+                "Printing report to console instead."
+            )
+        else:
+            logger.warning(
+                "SMTP credentials not configured (SMTP_USER / SMTP_APP_PASSWORD). "
+                "Printing email to console instead."
+            )
         print("\n" + "=" * 72)
-        print(f"📧  TO:      {recipient}")
+        print(f"📧  TO:      {recipient or '(console only)'}")
         print(f"📧  SUBJECT: {subject}")
         print("=" * 72)
         # Strip HTML tags for console output

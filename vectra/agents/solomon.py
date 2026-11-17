@@ -18,9 +18,13 @@ For Vercel deployments, Solomon generates the required configuration
 from __future__ import annotations
 
 import logging
+import re
+import uuid
+from pathlib import Path
 
+from vectra import config
 from vectra.graph.state import VectraState
-from vectra.tools.docker_tools import docker_build, docker_run
+from vectra.tools.docker_tools import docker_build, docker_run, detect_exposed_port
 from vectra.tools.vercel_tools import (
     vercel_generate_config,
     vercel_generate_requirements,
@@ -29,6 +33,19 @@ from vectra.tools.vercel_tools import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _repo_slug(repo_path: str) -> str:
+    """Derive a docker-safe slug from the target repo's directory name."""
+    name = Path(repo_path).resolve().name.lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", name).strip("-") or "app"
+    return slug[:30]
+
+
+def image_tag_for(repo_path: str) -> str:
+    """Deterministic per-repo image tag, so concurrent deployments of
+    different repos don't overwrite each other's images."""
+    return f"vectra-{_repo_slug(repo_path)}:latest"
 
 
 def validation_node(state: VectraState) -> dict:
@@ -43,7 +60,10 @@ def validation_node(state: VectraState) -> dict:
 
     logger.info("🧪 Validation: building Docker image (attempt %d) …", build_attempts)
 
-    success, build_log = docker_build(context_path=repo_path)
+    success, build_log = docker_build(
+        context_path=repo_path,
+        tag=image_tag_for(repo_path),
+    )
 
     status = "build_success" if success else "build_failed"
     log_entry = f"[Validation] docker build (attempt {build_attempts}) → {status}"
@@ -79,27 +99,51 @@ def solomon_node(state: VectraState) -> dict:
             "logs": logs + "\n" + log_entry,
         }
 
-    logger.info("🚀 Solomon: starting container …")
-    success, run_log = docker_run()
+    repo_path = state["repo_path"]
+
+    # ── Per-deployment identity ──────────────────────────────────────────
+    slug = _repo_slug(repo_path)
+    container_name = f"vectra-{slug}-{uuid.uuid4().hex[:8]}"
+    tag = image_tag_for(repo_path)
+
+    # ── Publish the port the Dockerfile EXPOSEs ──────────────────────────
+    exposed_port = detect_exposed_port(state.get("dockerfile", ""))
+    ports = f"{exposed_port}:{exposed_port}" if exposed_port else None
+
+    # ── Pass extracted secrets to the container at runtime ───────────────
+    # The Coder moves hardcoded secrets into .env and .dockerignore keeps it
+    # out of the image, so the container must receive it via --env-file.
+    env_file_path = Path(repo_path) / ".env"
+    env_file = str(env_file_path) if env_file_path.exists() else None
+
+    logger.info(
+        "🚀 Solomon: starting container %s (ports=%s, env_file=%s) …",
+        container_name, ports or "none", "yes" if env_file else "no",
+    )
+    success, run_log, container_id = docker_run(
+        tag=tag,
+        container_name=container_name,
+        ports=ports,
+        env_file=env_file,
+    )
 
     if success:
         status = "deployed"
-        log_entry = "[Solomon] Container deployed successfully."
+        log_entry = f"[Solomon] Container {container_name} deployed successfully."
+        if ports:
+            log_entry += f"\n[Solomon] Published on http://localhost:{exposed_port}"
         logger.info("✅ " + log_entry)
 
         # ── Register container for Sentinel monitoring ──────────
         try:
-            import uuid
             from vectra.utils.db import insert_container
 
             record_id = str(uuid.uuid4())
-            container_id = "vectra-container"  # matches docker_run default
-            repo_path = state.get("repo_path", "")
-            target_email = state.get("target_email", "marcus32holloway@gmail.com")
+            target_email = state.get("target_email") or config.TARGET_EMAIL
 
             insert_container(
                 record_id=record_id,
-                container_id=container_id,
+                container_id=container_id or container_name,
                 repository_path=repo_path,
                 target_email=target_email,
             )
@@ -161,26 +205,32 @@ def vercel_setup_node(state: VectraState) -> dict:
     )
     logs += f"\n[VercelSetup] {config_log}"
 
-    # ── Detect extra dependencies from the codebase ────────────────────
-    extra_deps: list[str] = []
-    codebase = state.get("codebase", "")
-    # Simple heuristic: scan imports for common packages
+    # ── Detect extra dependencies from actual import statements ────────
+    from vectra.agents.coder import _extract_python_imports
+
     import_map = {
         "sqlalchemy": "sqlalchemy",
         "pydantic": "pydantic",
         "httpx": "httpx",
         "jinja2": "jinja2",
-        "python-multipart": "python-multipart",
+        "multipart": "python-multipart",
         "aiofiles": "aiofiles",
         "databases": "databases",
         "passlib": "passlib",
-        "python-jose": "python-jose",
+        "jose": "python-jose",
         "bcrypt": "bcrypt",
         "starlette": "starlette",
     }
-    for import_name, pip_name in import_map.items():
-        if import_name in codebase:
-            extra_deps.append(pip_name)
+    used_imports: set[str] = set()
+    for fpath, content in file_manifest.items():
+        if fpath.endswith(".py"):
+            used_imports |= _extract_python_imports(content)
+
+    extra_deps = [
+        pip_name
+        for import_name, pip_name in import_map.items()
+        if import_name in used_imports
+    ]
 
     ok_reqs, reqs_log = vercel_generate_requirements(
         project_path=repo_path,
@@ -228,11 +278,12 @@ def vercel_deploy_node(state: VectraState) -> dict:
             "logs": logs + "\n" + log_entry,
         }
 
-    # ── Deploy (production) ───────────────────────────────────────────
-    logger.info("🚀 Vercel Deploy: deploying to production …")
+    # ── Deploy (preview by default; VECTRA_VERCEL_PROD=1 for production) ──
+    env_label = "production" if config.VERCEL_PROD else "preview"
+    logger.info("🚀 Vercel Deploy: deploying to %s …", env_label)
     success, deploy_log = vercel_deploy(
         project_path=repo_path,
-        prod=True,
+        prod=config.VERCEL_PROD,
     )
 
     # Extract the deployment URL from the log
@@ -272,7 +323,7 @@ def summary_node(state: VectraState) -> dict:
     """LangGraph node: Summary.
 
     Generates outputs/summary.md with the full run report.
-    Also writes BUGREWIND_SUMMARY.md into the target repository root.
+    Also writes VECTRA_SUMMARY.md into the target repository root.
     """
     import datetime
     from vectra.utils.file_ops import write_summary

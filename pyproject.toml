@@ -19,6 +19,9 @@ dependencies = [
     "markdown>=3.10.2",
 ]
 
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
 [project.scripts]
 vectra = "vectra.main:main"
 vectra-mcp = "vectra.mcp_server:run_server"

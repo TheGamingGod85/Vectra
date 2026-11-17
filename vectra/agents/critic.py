@@ -53,7 +53,7 @@ STATIC_PATTERNS: list[tuple[re.Pattern, str, str, str]] = [
             r"""os\.environ\s*\[\s*["'][^"']+["']\s*\]""",
         ),
         "Unsafe Env Access",
-        "medium",
+        "low",
         "Using os.environ[] without .get() — will crash if the variable is not set.",
     ),
     (
@@ -85,7 +85,7 @@ STATIC_PATTERNS: list[tuple[re.Pattern, str, str, str]] = [
     ),
     (
         re.compile(
-            r"""(?:md5|sha1)\s*\(""",
+            r"""\b(?:hashlib\s*\.\s*)?(?:md5|sha1)\s*\(""",
             re.IGNORECASE,
         ),
         "Weak Hashing",
@@ -102,7 +102,7 @@ STATIC_PATTERNS: list[tuple[re.Pattern, str, str, str]] = [
     ),
     (
         re.compile(
-            r"""debug\s*=\s*True""",
+            r"""\bdebug\s*=\s*True\b""",
             re.IGNORECASE,
         ),
         "Debug Mode Enabled",
@@ -193,14 +193,14 @@ You are given:
 4. Issues already found by a static scanner (your job is to find ADDITIONAL issues the scanner missed).
 
 IMPORTANT RULES:
-- You MUST find vulnerabilities AND unoptimized code. Real-world codebases almost always have security issues or performance bottlenecks.
 - Look for security issues: hardcoded secrets/passwords, SQL injection, path traversal, XSS, CSRF, command injection,
   insecure deserialization, plaintext password storage, missing input validation, debug mode left on,
   permissive CORS, missing rate limiting, insecure dependencies, missing HTTPS enforcement,
   improper error handling that leaks stack traces, and missing authentication/authorization checks.
 - Look for unoptimized code: unnecessary loops, blocking I/O in async endpoints, redundant database queries, O(n^2) algorithms where O(n log n) is better, memory leaks, and unnecessarily large dependencies.
-- NEVER return an empty array unless the code is genuinely flawless after careful analysis.
-- If you are uncertain, LIST the potential issue — false positives are better than missing a real vulnerability.
+- Report ONLY issues you can point to in the actual code, with the exact file and snippet.
+  Do NOT invent issues to fill the list — if the code has no further genuine problems, return an empty array [].
+- Every false positive costs a patching round and risks breaking working code, so be precise.
 
 For each finding, output a JSON object with these keys:
   - "id": sequential integer starting at 1
@@ -293,16 +293,18 @@ def _deduplicate_issues(
 ) -> list[dict]:
     """Merge static and LLM issues, removing duplicates.
 
-    Two issues are considered duplicates if they share the same file AND
-    category (case-insensitive).
+    Two issues are considered duplicates only if they share the same file,
+    category, AND code snippet — two distinct SQL injections in the same
+    file must both survive, or the Coder is never told about the second.
     """
-    seen: set[tuple[str, str]] = set()
+    seen: set[tuple[str, str, str]] = set()
     merged: list[dict] = []
 
     for issue in static_issues + llm_issues:
         key = (
             issue.get("file", "").lower(),
             issue.get("category", "").lower(),
+            " ".join(issue.get("snippet", "").split())[:120].lower(),
         )
         if key not in seen:
             seen.add(key)
@@ -351,9 +353,19 @@ def critic_node(state: VectraState) -> dict:
         json.dumps(static_issues, indent=2) if static_issues else "None"
     )
 
+    codebase_slice = codebase[:30_000]
+    if len(codebase) > 30_000:
+        logger.warning(
+            "⚠️  Codebase is %d chars but only the first 30,000 are sent to the "
+            "LLM — files beyond that point are NOT scanned by the LLM pass "
+            "(the static pre-scan still covers everything).",
+            len(codebase),
+        )
+        codebase_slice += "\n\n[NOTE: codebase truncated — additional files were not included]"
+
     prompt = CRITIC_PROMPT.format(
         plan=plan,
-        codebase=codebase[:30_000],
+        codebase=codebase_slice,
         patches=patches_text[:5_000],
         static_issues=static_issues_text[:5_000],
     )

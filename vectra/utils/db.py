@@ -112,7 +112,7 @@ def insert_container(
     record_id: str,
     container_id: str,
     repository_path: str,
-    target_email: str = "marcus32holloway@gmail.com",
+    target_email: str = "",
 ) -> None:
     """Insert a newly deployed container into the monitoring database.
 
@@ -120,7 +120,8 @@ def insert_container(
         record_id:       UUID for the database row.
         container_id:    Docker container ID / name.
         repository_path: Absolute path to the source repository.
-        target_email:    E-mail address for crash notifications.
+        target_email:    E-mail address for crash notifications.  Empty →
+                         Sentinel prints reports to the console instead.
     """
     conn = _get_connection()
     try:

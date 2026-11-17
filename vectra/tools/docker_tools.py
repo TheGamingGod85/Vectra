@@ -8,12 +8,26 @@ Docker CLI via ``subprocess``.  Only the Solomon agent should invoke these.
 from __future__ import annotations
 
 import logging
+import re
 import subprocess
+import time
 from pathlib import Path
+
+from vectra.config import DOCKER_TIMEOUT, DEFAULT_APP_PORT
 
 logger = logging.getLogger(__name__)
 
-DOCKER_TIMEOUT = 300  # seconds
+
+def detect_exposed_port(dockerfile_text: str) -> int | None:
+    """Return the first port declared via ``EXPOSE`` in a Dockerfile.
+
+    Returns ``None`` when no EXPOSE instruction is present (e.g. a CLI app).
+    """
+    for m in re.finditer(
+        r"^\s*EXPOSE\s+(\d+)", dockerfile_text, re.IGNORECASE | re.MULTILINE
+    ):
+        return int(m.group(1))
+    return None
 
 
 def docker_build(
@@ -60,27 +74,55 @@ def docker_build(
         return False, msg
 
 
+def _http_probe(port: int, timeout_seconds: int = 15) -> tuple[bool, str]:
+    """Try to reach ``http://localhost:<port>/`` until it responds or times out.
+
+    Any HTTP status code counts as reachable — a 404 still proves the server
+    is up and the port mapping works.
+    """
+    import httpx
+
+    deadline = time.monotonic() + timeout_seconds
+    last_error = ""
+    while time.monotonic() < deadline:
+        try:
+            response = httpx.get(f"http://localhost:{port}/", timeout=3.0)
+            return True, f"HTTP probe: got status {response.status_code} on port {port}"
+        except Exception as exc:
+            last_error = str(exc)
+            time.sleep(1.0)
+    return False, f"HTTP probe: no response on port {port} after {timeout_seconds}s ({last_error})"
+
+
 def docker_run(
     tag: str = "vectra-app:latest",
     container_name: str = "vectra-container",
     ports: str | None = None,
+    env_file: str | None = None,
     detach: bool = True,
     health_check_seconds: int = 5,
-) -> tuple[bool, str]:
+) -> tuple[bool, str, str]:
     """Run a container from the given image tag.
 
     If ``detach`` is True the container is started in the background and we
-    briefly wait to confirm it hasn't immediately crashed.
+    briefly wait to confirm it hasn't immediately crashed.  When a port
+    mapping is supplied, an HTTP probe against the host port is attempted
+    and its outcome appended to the log (informational — a non-HTTP app
+    won't fail deployment because of it).
 
     Args:
         tag:                   Image to run.
         container_name:        Name for the container (auto-removed first).
         ports:                 Optional port mapping, e.g. ``"8000:8000"``.
+        env_file:              Optional path to an env file passed via
+                               ``--env-file`` so extracted secrets reach the
+                               container at runtime.
         detach:                Run in detached mode.
         health_check_seconds:  Seconds to wait before checking container status.
 
     Returns:
-        ``(success: bool, log: str)``
+        ``(success: bool, log: str, container_id: str)`` – container_id is the
+        full ID printed by ``docker run -d`` (empty string on failure).
     """
     # Remove any existing container with the same name
     subprocess.run(
@@ -94,6 +136,8 @@ def docker_run(
         cmd.append("-d")
     if ports:
         cmd.extend(["-p", ports])
+    if env_file:
+        cmd.extend(["--env-file", env_file])
     cmd.append(tag)
 
     logger.info("Running: %s", " ".join(cmd))
@@ -109,11 +153,13 @@ def docker_run(
 
         if result.returncode != 0:
             logger.error("Docker run FAILED (rc=%d)", result.returncode)
-            return False, log.strip()
+            return False, log.strip(), ""
+
+        # `docker run -d` prints the container ID on stdout
+        container_id = result.stdout.strip().splitlines()[-1] if result.stdout.strip() else ""
 
         if detach:
             # Wait briefly, then inspect container state
-            import time
             time.sleep(health_check_seconds)
 
             inspect = subprocess.run(
@@ -123,10 +169,7 @@ def docker_run(
             )
             is_running = inspect.stdout.strip().lower() == "true"
 
-            if is_running:
-                logger.info("Container %s is running", container_name)
-                return True, f"Container {container_name} started successfully.\n{log.strip()}"
-            else:
+            if not is_running:
                 # Grab logs from the crashed container
                 logs_result = subprocess.run(
                     ["docker", "logs", container_name],
@@ -135,18 +178,31 @@ def docker_run(
                 )
                 crash_log = logs_result.stdout + "\n" + logs_result.stderr
                 logger.error("Container exited immediately")
-                return False, f"Container exited immediately.\n{crash_log.strip()}"
+                return False, f"Container exited immediately.\n{crash_log.strip()}", container_id
 
-        return True, log.strip()
+            probe_note = ""
+            if ports:
+                host_port = int(ports.split(":", 1)[0])
+                probe_ok, probe_msg = _http_probe(host_port)
+                probe_note = "\n" + probe_msg
+                if probe_ok:
+                    logger.info(probe_msg)
+                else:
+                    logger.warning("%s — container is running but may not serve HTTP.", probe_msg)
+
+            logger.info("Container %s is running", container_name)
+            return True, f"Container {container_name} started successfully.{probe_note}\n{log.strip()}", container_id
+
+        return True, log.strip(), container_id
 
     except subprocess.TimeoutExpired:
         msg = f"Docker run timed out after {DOCKER_TIMEOUT}s"
         logger.error(msg)
-        return False, msg
+        return False, msg, ""
     except FileNotFoundError:
         msg = "Docker CLI not found. Is Docker installed and in PATH?"
         logger.error(msg)
-        return False, msg
+        return False, msg, ""
 
 
 def docker_stop(container_name: str = "vectra-container") -> tuple[bool, str]:

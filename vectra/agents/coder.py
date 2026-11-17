@@ -24,6 +24,7 @@ import re
 import subprocess
 from pathlib import Path
 
+from vectra import config
 from vectra.graph.state import VectraState
 from vectra.utils.llm import call_ollama
 from vectra.utils.file_ops import apply_patch, build_codebase_text
@@ -645,16 +646,24 @@ def _install_dependencies(
     repo_path: str,
     packages: set[str],
     file_manifest: dict[str, str],
+    allow_install: bool = True,
 ) -> tuple[list[str], str]:
     """Install newly introduced packages in the target repo.
 
     Detects the package manager and runs the appropriate install command.
     Also updates the dependency file (requirements.txt) if needed.
 
+    When ``allow_install`` is False (VECTRA_AUTO_INSTALL_DEPS=0), no install
+    command is executed — dependency files are still updated so Docker builds
+    keep working, but nothing touches the local environment.  This is the
+    safety valve against the LLM hallucinating (or typosquatting) a package
+    name that would otherwise be installed blindly.
+
     Args:
         repo_path:      Absolute path to the repo root.
         packages:        Set of top-level Python import names to install.
         file_manifest:  Current file manifest (may be updated in place).
+        allow_install:  Whether install commands may be executed.
 
     Returns:
         (installed_packages, log_text)
@@ -676,6 +685,14 @@ def _install_dependencies(
     installed: list[str] = []
 
     if pkg_manager == "uv":
+        if not allow_install:
+            msg = (
+                f"  ⚠️ Auto-install disabled (VECTRA_AUTO_INSTALL_DEPS=0). "
+                f"Add manually with: uv add {' '.join(pip_names)}"
+            )
+            logger.warning(msg.strip())
+            return [], msg
+
         # Use `uv add` for each package
         for pkg_name in pip_names:
             cmd = ["uv", "add", pkg_name]
@@ -756,7 +773,12 @@ def _install_dependencies(
             logger.info("✅ Added to requirements.txt: %s", ", ".join(new_entries))
 
         # Also try pip install if possible
-        if new_entries:
+        if new_entries and not allow_install:
+            log_lines.append(
+                "  ⚠️ Auto-install disabled (VECTRA_AUTO_INSTALL_DEPS=0) — "
+                "requirements.txt updated, but nothing was installed locally."
+            )
+        if new_entries and allow_install:
             cmd = ["pip", "install"] + new_entries
             logger.info("Running: %s in %s", " ".join(cmd), repo_path)
             try:
@@ -771,6 +793,14 @@ def _install_dependencies(
                 pass  # Non-critical, Docker will install from requirements.txt
 
     elif pkg_manager == "poetry":
+        if not allow_install:
+            msg = (
+                f"  ⚠️ Auto-install disabled (VECTRA_AUTO_INSTALL_DEPS=0). "
+                f"Add manually with: poetry add {' '.join(pip_names)}"
+            )
+            logger.warning(msg.strip())
+            return [], msg
+
         for pkg_name in pip_names:
             cmd = ["poetry", "add", pkg_name]
             logger.info("Running: %s in %s", " ".join(cmd), repo_path)
@@ -817,6 +847,12 @@ def coder_node(state: VectraState) -> dict:
     old_manifest = dict(file_manifest)
 
     relevant_src = _get_relevant_files(file_manifest, current_issues)
+    if len(relevant_src) > 25_000:
+        logger.warning(
+            "⚠️  Relevant source is %d chars but only the first 25,000 are sent "
+            "to the LLM — patches for files beyond that point may be incomplete.",
+            len(relevant_src),
+        )
 
     prompt = CODER_FIX_PROMPT.format(
         issues=json.dumps(current_issues, indent=2)[:10_000],
@@ -882,7 +918,10 @@ def coder_node(state: VectraState) -> dict:
     dep_log = ""
     if new_imports:
         logger.info("📦 Detected new imports: %s", ", ".join(sorted(new_imports)))
-        installed, dep_log = _install_dependencies(repo_path, new_imports, file_manifest)
+        installed, dep_log = _install_dependencies(
+            repo_path, new_imports, file_manifest,
+            allow_install=config.AUTO_INSTALL_DEPS,
+        )
         if installed:
             logger.info("📦 Installed %d new package(s).", len(installed))
 

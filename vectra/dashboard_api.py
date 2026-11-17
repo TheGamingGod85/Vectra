@@ -39,6 +39,7 @@ class runRequest(BaseModel):
     deploy_prompt: str = "Deploy this project securely via Docker."
     max_iterations: int = 3
     deploy_target: str | None = None
+    target_email: str = ""
 
 # ── State ──────────────────────────────────────────────────────────────────
 
@@ -141,6 +142,7 @@ async def execute_workflow(req: runRequest):
         "repo_path": req.repo_path,
         "deploy_prompt": req.deploy_prompt,
         "deploy_target": resolved_target,
+        "target_email": req.target_email,
         "codebase": "",
         "file_manifest": {},
         "plan": "",

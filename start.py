@@ -4,7 +4,7 @@ import subprocess
 
 def print_header():
     print("\n==============================================")
-    print("             BUGREWIND LAUNCHER               ")
+    print("               VECTRA LAUNCHER                ")
     print("==============================================\n")
 
 def main():

@@ -207,7 +207,7 @@ def write_summary(repo_path: str, summary_md: str) -> str:
     logger.info("Summary written to %s", internal_path)
 
     # ── Write to the target repository root ───────────────────────────────
-    repo_summary_path = Path(repo_path) / "BUGREWIND_SUMMARY.md"
+    repo_summary_path = Path(repo_path) / "VECTRA_SUMMARY.md"
     try:
         repo_summary_path.write_text(summary_md, encoding="utf-8")
         logger.info("Summary also written to %s", repo_summary_path)

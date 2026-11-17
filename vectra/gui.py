@@ -62,7 +62,7 @@ def launch():
 
         # Start Frontend
         frontend_proc = subprocess.Popen(
-            ["npm", "run", "dev"],
+            ["bun", "run", "dev"],
             cwd=dashboard_dir,
         )
 
